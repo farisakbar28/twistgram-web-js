@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Home, Search, Plus, Send } from 'lucide-react';
 import Avatar from '../common/Avatar';
@@ -12,9 +12,26 @@ const BottomNav: React.FC = () => {
   const location = useLocation();
   const { currentUser } = useAuth();
 
+  const [unreadChat, setUnreadChat] = useState(0);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const fetchChatCount = async () => {
+      try {
+        const { getUnreadMessagesCount } = await import('../../services/mock/chat');
+        const count = await getUnreadMessagesCount(currentUser.id);
+        setUnreadChat(count);
+      } catch {}
+    };
+
+    fetchChatCount();
+    const interval = setInterval(fetchChatCount, 4000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   if (!currentUser) return null;
 
-  const chatBadge = 5;
+  const chatBadge = unreadChat;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 bg-surface-950/90 backdrop-blur-md border-t border-surface-900/80 md:hidden flex items-center justify-around px-2 select-none">

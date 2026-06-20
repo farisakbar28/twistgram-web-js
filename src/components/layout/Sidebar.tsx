@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Home, Search, Send, Bell, User, PlusCircle, LogOut, Settings } from 'lucide-react';
 import Avatar from '../common/Avatar';
@@ -22,6 +22,29 @@ interface SidebarLink {
 const Sidebar: React.FC = () => {
   const location = useLocation();
   const { currentUser, logout } = useAuth();
+  
+  const [unreadChat, setUnreadChat] = useState(0);
+  const [unreadNotif, setUnreadNotif] = useState(0);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const fetchCounts = async () => {
+      try {
+        const { getUnreadMessagesCount } = await import('../../services/mock/chat');
+        const { getUnreadNotificationsCount } = await import('../../services/mock/notification');
+        const chatCount = await getUnreadMessagesCount(currentUser.id);
+        const notifCount = await getUnreadNotificationsCount(currentUser.id);
+        setUnreadChat(chatCount);
+        setUnreadNotif(notifCount);
+      } catch (err) {
+        console.error('Failed to poll unread counts:', err);
+      }
+    };
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 4000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   if (!currentUser) return null;
 
@@ -40,13 +63,13 @@ const Sidebar: React.FC = () => {
       label: 'Pesan',
       path: '/chat',
       icon: <Send className="h-5 w-5 -rotate-12 mt-[-2px]" />,
-      badge: 5,
+      badge: unreadChat,
     },
     {
       label: 'Notifikasi',
       path: '/notifications',
       icon: <Bell className="h-5 w-5" />,
-      badge: 3,
+      badge: unreadNotif,
     },
     {
       label: 'Profil',

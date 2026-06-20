@@ -11,7 +11,7 @@
  */
 
 import { delay } from '../../utils';
-import type { User } from '../../types/auth';
+import type { User } from '../../types/index';
 import type {
   UserProfile,
   Follow,
@@ -27,7 +27,7 @@ import type {
 // ============================================================
 
 /** Referensi ke mock users dari auth service — diimpor untuk cross-reference */
-const MOCK_USERS: User[] = [
+export const MOCK_USERS: User[] = [
   {
     id: 'user-001',
     name: 'Faris Akbar',
@@ -37,7 +37,7 @@ const MOCK_USERS: User[] = [
     phone_verified: true,
     email_verified: true,
     bio: 'Building Twistgram 🚀 | Frontend Developer',
-    avatar_url: null,
+    avatar_url: undefined,
     is_private: false,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-06-01T00:00:00Z',
@@ -47,11 +47,11 @@ const MOCK_USERS: User[] = [
     name: 'Clara Clarissa',
     username: 'claraclarissa',
     email: 'clara@example.com',
-    phone: null,
+    phone: undefined,
     phone_verified: false,
     email_verified: true,
     bio: 'Photographer & Content Creator 📸',
-    avatar_url: null,
+    avatar_url: undefined,
     is_private: true,
     created_at: '2026-02-01T00:00:00Z',
     updated_at: '2026-06-10T00:00:00Z',
@@ -61,11 +61,11 @@ const MOCK_USERS: User[] = [
     name: 'Andi Wirawan',
     username: 'andiwirawan',
     email: 'andi@example.com',
-    phone: null,
+    phone: undefined,
     phone_verified: false,
     email_verified: true,
     bio: 'Travel & kuliner 🌍',
-    avatar_url: null,
+    avatar_url: undefined,
     is_private: false,
     created_at: '2026-03-01T00:00:00Z',
     updated_at: '2026-06-15T00:00:00Z',
@@ -75,11 +75,11 @@ const MOCK_USERS: User[] = [
     name: 'Siti Rahayu',
     username: 'sitirahayu',
     email: 'siti@example.com',
-    phone: null,
+    phone: undefined,
     phone_verified: false,
     email_verified: true,
-    bio: null,
-    avatar_url: null,
+    bio: undefined,
+    avatar_url: undefined,
     is_private: false,
     created_at: '2026-04-01T00:00:00Z',
     updated_at: '2026-06-18T00:00:00Z',
@@ -89,11 +89,11 @@ const MOCK_USERS: User[] = [
     name: 'Budi Santoso',
     username: 'budisantoso',
     email: 'budi@example.com',
-    phone: null,
+    phone: undefined,
     phone_verified: false,
     email_verified: true,
     bio: 'Tech enthusiast 💻',
-    avatar_url: null,
+    avatar_url: undefined,
     is_private: true,
     created_at: '2026-05-01T00:00:00Z',
     updated_at: '2026-06-20T00:00:00Z',
@@ -125,7 +125,7 @@ const MOCK_USER_INTERESTS: Record<string, string[]> = {
  * user-003 follows user-001
  * user-005 (privat) punya pending request dari user-004
  */
-interface MockFollow {
+export interface MockFollow {
   id: string;
   follower_id: string;
   following_id: string;
@@ -134,7 +134,7 @@ interface MockFollow {
   created_at: string;
 }
 
-const mockFollows: MockFollow[] = [
+export const mockFollows: MockFollow[] = [
   { id: 'follow-001', follower_id: 'user-001', following_id: 'user-002', status: 'pending', is_close_friend: false, created_at: '2026-06-01T00:00:00Z' },
   { id: 'follow-002', follower_id: 'user-001', following_id: 'user-003', status: 'accepted', is_close_friend: false, created_at: '2026-06-02T00:00:00Z' },
   { id: 'follow-003', follower_id: 'user-001', following_id: 'user-004', status: 'accepted', is_close_friend: false, created_at: '2026-06-03T00:00:00Z' },
@@ -145,14 +145,14 @@ const mockFollows: MockFollow[] = [
 ];
 
 /** Mock blocks */
-interface MockBlock {
+export interface MockBlock {
   id: string;
   blocker_id: string;
   blocked_id: string;
   created_at: string;
 }
 
-const mockBlocks: MockBlock[] = [];
+export const mockBlocks: MockBlock[] = [];
 
 // ============================================================
 // Storage helpers for currentUser updates
@@ -337,6 +337,14 @@ export const followUser = async (
     created_at: new Date().toISOString(),
   };
   mockFollows.push(newFollow);
+
+  // Memicu notifikasi in-app
+  try {
+    const { createNotification } = await import('./notification');
+    const type = target.is_private ? 'follow_request' : 'follow';
+    await createNotification(targetUserId, currentUserId, type);
+  } catch {}
+
   return newFollow;
 };
 
@@ -443,6 +451,12 @@ export const approveFollowRequest = async (requestId: string): Promise<void> => 
   const follow = mockFollows.find(f => f.id === requestId);
   if (!follow || follow.status !== 'pending') throw new Error('Permintaan tidak ditemukan.');
   follow.status = 'accepted';
+
+  // Memicu notifikasi in-app
+  try {
+    const { createNotification } = await import('./notification');
+    await createNotification(follow.follower_id, follow.following_id, 'follow');
+  } catch {}
 };
 
 /** POST /follow-requests/:id/decline */

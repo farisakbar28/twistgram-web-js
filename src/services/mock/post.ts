@@ -565,6 +565,15 @@ export const likePost = async (postId: string, currentUserId: string): Promise<v
       created_at: new Date().toISOString(),
     });
     setStorageData(STORAGE_KEYS.LIKES, likes);
+
+    // Memicu notifikasi in-app
+    try {
+      const post = getPostsDb().find(p => p.id === postId);
+      if (post) {
+        const { createNotification } = await import('./notification');
+        await createNotification(post.user_id, currentUserId, 'like', postId);
+      }
+    } catch {}
   }
 };
 
@@ -628,6 +637,15 @@ export const createComment = async (
 
   comments.push(newComment);
   setStorageData(STORAGE_KEYS.COMMENTS, comments);
+
+  // Memicu notifikasi in-app
+  try {
+    const post = getPostsDb().find(p => p.id === postId);
+    if (post) {
+      const { createNotification } = await import('./notification');
+      await createNotification(post.user_id, currentUserId, 'comment', postId);
+    }
+  } catch {}
 
   return {
     ...newComment,

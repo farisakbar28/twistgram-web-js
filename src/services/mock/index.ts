@@ -15,5 +15,8 @@ export * from './auth';
 export * from './social';
 export * from './post';
 export * from './story';
+export * from './search';
+export * from './chat';
+export * from './notification';
 
 
