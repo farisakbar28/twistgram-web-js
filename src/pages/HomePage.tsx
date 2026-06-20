@@ -11,6 +11,12 @@ import Avatar from '../components/common/Avatar';
 import { Link } from 'react-router-dom';
 import { Sparkles, Users } from 'lucide-react';
 
+// Stories
+import { StoriesBar } from '../features/story/StoriesBar';
+import { StoryViewer } from '../features/story/StoryViewer';
+import { CreateStoryModal } from '../features/story/CreateStoryModal';
+import type { StoryGroup } from '../services/mock/story';
+
 const HomePage: React.FC = () => {
   const { currentUser } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -18,6 +24,13 @@ const HomePage: React.FC = () => {
   
   // Suggestions list
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
+
+  // Stories States
+  const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
+  const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
+  const [viewerStoryGroups, setViewerStoryGroups] = useState<StoryGroup[]>([]);
+  const [activeStoryGroupIndex, setActiveStoryGroupIndex] = useState(0);
+  const [storyRefreshTrigger, setStoryRefreshTrigger] = useState(0);
 
   // Fetch feed posts
   const fetchFeed = useCallback(async () => {
@@ -67,33 +80,22 @@ const HomePage: React.FC = () => {
 
   if (!currentUser) return null;
 
+  const handleSelectStoryGroup = (groups: StoryGroup[], index: number) => {
+    setViewerStoryGroups(groups);
+    setActiveStoryGroupIndex(index);
+    setIsStoryViewerOpen(true);
+  };
+
   return (
     <div className="max-w-4xl mx-auto w-full px-4 py-6 flex gap-6 items-start">
       {/* Feed Column */}
       <div className="flex-1 max-w-lg mx-auto flex flex-col">
-        {/* Stories bar placeholder (Fase 5) */}
-        <div className="w-full bg-surface-900 border border-surface-800/80 rounded-2xl p-4 mb-4 flex items-center gap-4 overflow-x-auto scrollbar-none select-none">
-          <div className="flex flex-col items-center shrink-0 cursor-pointer group">
-            <div className="w-14 h-14 rounded-full p-[2.5px] bg-surface-800 border border-surface-700 group-hover:border-neutral-500 transition-colors flex items-center justify-center relative">
-              <Avatar name={currentUser.name} size="md" src={currentUser.avatar_url} />
-              <span className="absolute bottom-0 right-0 w-4 h-4 bg-brand-500 rounded-full border-2 border-surface-900 flex items-center justify-center text-white text-[10px] font-bold">
-                +
-              </span>
-            </div>
-            <span className="text-[10px] text-neutral-400 mt-1 truncate max-w-[60px]">Cerita Anda</span>
-          </div>
-          {/* Mock other stories (disabled link, will be active in Phase 5) */}
-          {suggestedUsers.map(user => (
-            <div key={user.id} className="flex flex-col items-center shrink-0 cursor-not-allowed opacity-80">
-              <div className="w-14 h-14 rounded-full p-[2.5px] bg-gradient-to-tr from-brand-500 to-brand-300 flex items-center justify-center">
-                <div className="w-full h-full bg-surface-950 rounded-full p-[2px] flex items-center justify-center">
-                  <Avatar name={user.name} size="md" src={user.avatar_url} />
-                </div>
-              </div>
-              <span className="text-[10px] text-neutral-400 mt-1 truncate max-w-[60px]">{user.username}</span>
-            </div>
-          ))}
-        </div>
+        {/* Dynamic Stories Bar */}
+        <StoriesBar
+          onSelectStoryGroup={handleSelectStoryGroup}
+          onOpenCreateStory={() => setIsCreateStoryOpen(true)}
+          refreshTrigger={storyRefreshTrigger}
+        />
 
         {/* Feed Posts */}
         {isLoading ? (
@@ -190,6 +192,25 @@ const HomePage: React.FC = () => {
           <p className="mt-1">Dibuat sebagai implementasi frontend media sosial berkualitas tinggi.</p>
         </footer>
       </div>
+
+      {/* Story Modals */}
+      {isCreateStoryOpen && (
+        <CreateStoryModal
+          isOpen={isCreateStoryOpen}
+          onClose={() => setIsCreateStoryOpen(false)}
+          onStoryCreated={() => setStoryRefreshTrigger(prev => prev + 1)}
+        />
+      )}
+
+      {isStoryViewerOpen && (
+        <StoryViewer
+          isOpen={isStoryViewerOpen}
+          onClose={() => setIsStoryViewerOpen(false)}
+          storyGroups={viewerStoryGroups}
+          initialGroupIndex={activeStoryGroupIndex}
+          onStoryDeleted={() => setStoryRefreshTrigger(prev => prev + 1)}
+        />
+      )}
     </div>
   );
 };
