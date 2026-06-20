@@ -19,6 +19,8 @@ import ChatPage from '../pages/ChatPage';
 import NotificationPage from '../pages/NotificationPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import ShowcasePage from '../pages/ShowcasePage';
+import CreatePostPage from '../pages/CreatePostPage';
+import PostDetailPage from '../pages/PostDetailPage';
 
 // Layout & Route Guards
 import PageContainer from '../components/layout/PageContainer';
@@ -96,6 +98,14 @@ export const router = createBrowserRouter([
       {
         path: '/follow-requests',
         element: <FollowRequestsPage />,
+      },
+      {
+        path: '/posts/create',
+        element: <CreatePostPage />,
+      },
+      {
+        path: '/posts/:id',
+        element: <PostDetailPage />,
       },
       {
         path: '/showcase',

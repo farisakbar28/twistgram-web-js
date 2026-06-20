@@ -1,7 +1,8 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Home, Search, Plus, Send } from 'lucide-react';
 import Avatar from '../common/Avatar';
+import { useAuth } from '../../features/auth/AuthContext';
 
 // ============================================================
 // Component
@@ -9,19 +10,11 @@ import Avatar from '../common/Avatar';
 
 const BottomNav: React.FC = () => {
   const location = useLocation();
+  const { currentUser } = useAuth();
 
-  // Mock data (will hook up to stores/services in Phase 2+)
-  const currentUser = {
-    name: 'Faris Akbar',
-    username: 'farisakbar28',
-    avatarUrl: undefined,
-  };
+  if (!currentUser) return null;
 
   const chatBadge = 5;
-
-  const handleCreatePostClick = () => {
-    alert('Buka dialog Buat Postingan Baru (diimplementasikan di Fase 4)');
-  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 h-16 bg-surface-950/90 backdrop-blur-md border-t border-surface-900/80 md:hidden flex items-center justify-around px-2 select-none">
@@ -54,14 +47,13 @@ const BottomNav: React.FC = () => {
       </NavLink>
 
       {/* Special Create Post Button */}
-      <button
-        type="button"
-        onClick={handleCreatePostClick}
+      <Link
+        to="/posts/create"
         className="flex items-center justify-center w-11 h-11 rounded-full bg-brand-gradient text-white shadow-glow-sm hover:shadow-glow-md active:scale-95 transition-all duration-200"
         aria-label="Buat Postingan Baru"
       >
         <Plus className="h-6 w-6 font-bold" />
-      </button>
+      </Link>
 
       {/* Chat Link */}
       <NavLink
@@ -97,7 +89,7 @@ const BottomNav: React.FC = () => {
         <Avatar
           name={currentUser.name}
           size="xs"
-          src={currentUser.avatarUrl}
+          src={currentUser.avatar_url}
           // Add border wrapper if active
           className={location.pathname.startsWith(`/profile/${currentUser.username}`) ? 'ring-2 ring-brand-400' : ''}
         />
@@ -108,3 +100,4 @@ const BottomNav: React.FC = () => {
 };
 
 export default BottomNav;
+

@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Home, Search, Send, Bell, User, PlusCircle, LogOut, Settings } from 'lucide-react';
 import Avatar from '../common/Avatar';
+import { useAuth } from '../../features/auth/AuthContext';
 
 // ============================================================
 // Types & Navigation Config
@@ -20,13 +21,9 @@ interface SidebarLink {
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
+  const { currentUser, logout } = useAuth();
 
-  // Mock data (will hook up to stores/services in Phase 2+)
-  const currentUser = {
-    name: 'Faris Akbar',
-    username: 'farisakbar28',
-    avatarUrl: undefined, // test initial generator
-  };
+  if (!currentUser) return null;
 
   const links: SidebarLink[] = [
     {
@@ -58,10 +55,6 @@ const Sidebar: React.FC = () => {
     },
   ];
 
-  const handleCreatePostClick = () => {
-    alert('Buka dialog Buat Postingan Baru (diimplementasikan di Fase 4)');
-  };
-
   return (
     <aside className="hidden md:flex flex-col justify-between w-64 xl:w-72 h-screen bg-surface-950 border-r border-surface-900/80 p-6 fixed left-0 top-0 z-30 transition-all duration-200">
       {/* Top Section */}
@@ -89,7 +82,7 @@ const Sidebar: React.FC = () => {
                   'flex items-center justify-between px-4 py-3 rounded-xl',
                   'font-medium text-sm transition-all duration-200 select-none group',
                   isActive
-                    ? 'bg-brand-500/10 text-brand-400 font-semibold shadow-glow-sm'
+                     ? 'bg-brand-500/10 text-brand-400 font-semibold shadow-glow-sm'
                     : 'text-neutral-400 hover:text-neutral-200 hover:bg-surface-900',
                 ].join(' ')}
               >
@@ -117,9 +110,8 @@ const Sidebar: React.FC = () => {
         </nav>
 
         {/* Create Post Button */}
-        <button
-          type="button"
-          onClick={handleCreatePostClick}
+        <Link
+          to="/posts/create"
           className={[
             'flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl',
             'bg-brand-gradient text-white font-semibold text-sm',
@@ -129,7 +121,7 @@ const Sidebar: React.FC = () => {
         >
           <PlusCircle className="h-5 w-5" />
           <span>Buat Postingan</span>
-        </button>
+        </Link>
       </div>
 
       {/* Bottom Section - User Profile Card */}
@@ -140,7 +132,7 @@ const Sidebar: React.FC = () => {
             <Avatar
               name={currentUser.name}
               size="sm"
-              src={currentUser.avatarUrl}
+              src={currentUser.avatar_url}
             />
             <div className="flex flex-col text-left overflow-hidden max-w-[120px]">
               <span className="text-xs font-semibold text-neutral-200 truncate">
@@ -155,7 +147,7 @@ const Sidebar: React.FC = () => {
           <div className="flex items-center gap-0.5">
             {/* Settings Link */}
             <Link
-              to="/settings"
+              to="/profile/edit"
               className="text-neutral-500 hover:text-neutral-300 p-1.5 rounded-lg hover:bg-surface-900 transition-colors"
               title="Pengaturan"
             >
@@ -165,7 +157,7 @@ const Sidebar: React.FC = () => {
             {/* Logout Trigger */}
             <button
               type="button"
-              onClick={() => alert('Logout dari aplikasi')}
+              onClick={logout}
               className="text-neutral-500 hover:text-danger-400 p-1.5 rounded-lg hover:bg-danger-500/10 transition-colors"
               title="Keluar"
             >

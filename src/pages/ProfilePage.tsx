@@ -23,6 +23,9 @@ import {
   ShieldOff,
   UserCog,
   Bell,
+  Bookmark,
+  Heart,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '../features/auth/AuthContext';
 import {
@@ -32,8 +35,13 @@ import {
   blockUser,
   reportContent,
 } from '../services/mock/social';
+import {
+  getUserPosts,
+  getUserSavedPosts,
+} from '../services/mock/post';
 import type { UserProfile } from '../types/social';
 import type { ReportReason } from '../types/social';
+import type { Post } from '../types/index';
 import Avatar from '../components/common/Avatar';
 import Button from '../components/common/Button';
 import FollowButton from '../components/common/FollowButton';
@@ -82,6 +90,12 @@ const ProfilePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Post states
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [savedPosts, setSavedPosts] = useState<Post[]>([]);
+  const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts');
+  const [isPostsLoading, setIsPostsLoading] = useState(false);
+
   // Modal states
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
@@ -107,6 +121,27 @@ const ProfilePage: React.FC = () => {
   useEffect(() => {
     loadProfile();
   }, [loadProfile]);
+
+  // Load user posts & saved posts
+  useEffect(() => {
+    if (!profile || !currentUser) return;
+    const fetchUserData = async () => {
+      setIsPostsLoading(true);
+      try {
+        const userPosts = await getUserPosts(profile.id, currentUser.id);
+        setPosts(userPosts);
+        if (profile.is_own_profile) {
+          const saved = await getUserSavedPosts(currentUser.id);
+          setSavedPosts(saved);
+        }
+      } catch (err) {
+        console.error('Gagal memuat data postingan profil:', err);
+      } finally {
+        setIsPostsLoading(false);
+      }
+    };
+    fetchUserData();
+  }, [profile, currentUser]);
 
   // ============================================================
   // Handlers
@@ -340,18 +375,40 @@ const ProfilePage: React.FC = () => {
       {/* ── Divider ── */}
       <div className="border-t border-surface-800 mx-4" />
 
-      {/* ── Tab Bar (hanya Grid sementara di Fase 3) ── */}
-      <div className="flex border-b border-surface-800">
-        <button className="flex-1 py-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-neutral-100 border-b-2 border-brand-500 transition-colors">
+      {/* ── Tab Bar (Grid Postingan dan Tersimpan jika profil sendiri) ── */}
+      <div className="flex border-b border-surface-800 select-none">
+        <button
+          onClick={() => setActiveTab('posts')}
+          className={[
+            'flex-1 py-3 flex items-center justify-center gap-1.5 text-xs font-semibold transition-colors',
+            activeTab === 'posts'
+              ? 'text-neutral-100 border-b-2 border-brand-500'
+              : 'text-neutral-500 hover:text-neutral-300',
+          ].join(' ')}
+        >
           <Grid3X3 className="h-4 w-4" />
-          <span className="hidden sm:inline">Postingan</span>
+          <span>Postingan</span>
         </button>
+        {profile.is_own_profile && (
+          <button
+            onClick={() => setActiveTab('saved')}
+            className={[
+              'flex-1 py-3 flex items-center justify-center gap-1.5 text-xs font-semibold transition-colors',
+              activeTab === 'saved'
+                ? 'text-neutral-100 border-b-2 border-brand-500'
+                : 'text-neutral-500 hover:text-neutral-300',
+            ].join(' ')}
+          >
+            <Bookmark className="h-4 w-4" />
+            <span>Tersimpan</span>
+          </button>
+        )}
       </div>
 
       {/* ── Post Grid / Locked State ── */}
       {isPrivateAndLocked ? (
         /* SOC-01: akun privat, bukan follower */
-        <div className="flex flex-col items-center gap-4 py-16 px-6 text-center">
+        <div className="flex flex-col items-center gap-4 py-16 px-6 text-center select-none">
           <div className="flex items-center justify-center w-16 h-16 rounded-full bg-surface-800 border border-surface-700">
             <Lock className="h-8 w-8 text-neutral-500" />
           </div>
@@ -367,27 +424,139 @@ const ProfilePage: React.FC = () => {
             </span>
           )}
         </div>
+      ) : isPostsLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Spinner size="md" className="text-brand-500" />
+        </div>
       ) : (
-        /* Post Grid Placeholder — akan diisi di Fase 4 */
-        <div className="grid grid-cols-3 gap-0.5 mt-0.5">
-          {Array.from({ length: Math.min(profile.post_count, 9) }).map((_, i) => (
-            <div
-              key={i}
-              className="aspect-square bg-surface-800 animate-pulse"
-            />
-          ))}
-          {profile.post_count === 0 && (
-            <div className="col-span-3 py-16">
-              <EmptyState
-                icon={<Grid3X3 className="h-10 w-10" />}
-                title="Belum ada postingan"
-                description={
-                  profile.is_own_profile
-                    ? 'Mulai bagikan momen pertamamu!'
-                    : 'Pengguna ini belum memposting apa pun.'
-                }
-              />
-            </div>
+        /* Post Grid Asli */
+        <div>
+          {activeTab === 'posts' ? (
+            /* Tab Postingan */
+            posts.length === 0 ? (
+              <div className="py-16">
+                <EmptyState
+                  icon={<Grid3X3 className="h-10 w-10" />}
+                  title="Belum ada postingan"
+                  description={
+                    profile.is_own_profile
+                      ? 'Mulai bagikan momen pertamamu!'
+                      : 'Pengguna ini belum memposting apa pun.'
+                  }
+                  actionLabel={profile.is_own_profile ? 'Buat Postingan' : undefined}
+                  onAction={profile.is_own_profile ? () => navigate('/posts/create') : undefined}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-0.5 mt-0.5">
+                {posts.map(item => {
+                  const media = item.media?.[0];
+                  return (
+                    <Link
+                      key={item.id}
+                      to={`/posts/${item.id}`}
+                      className="relative aspect-square bg-surface-800 overflow-hidden group border border-surface-900"
+                    >
+                      {media?.media_type === 'video' ? (
+                        <video
+                          src={media.media_url}
+                          className="w-full h-full object-cover"
+                          muted
+                        />
+                      ) : (
+                        <img
+                          src={media?.media_url}
+                          alt="Thumbnail Post"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      )}
+
+                      {/* Video indicator icon in top right */}
+                      {media?.media_type === 'video' && (
+                        <div className="absolute top-2 right-2 bg-black/50 p-1 rounded-full text-white pointer-events-none">
+                          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </div>
+                      )}
+
+                      {/* Hover Overlay */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6 text-white font-bold text-xs select-none">
+                        <div className="flex items-center gap-1.5">
+                          <Heart className="h-4 w-4 fill-white" />
+                          {formatCount(item.likes_count ?? 0)}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MessageCircle className="h-4 w-4 fill-white" />
+                          {formatCount(item.comments_count ?? 0)}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            /* Tab Tersimpan */
+            savedPosts.length === 0 ? (
+              <div className="py-16">
+                <EmptyState
+                  icon={<Bookmark className="h-10 w-10" />}
+                  title="Belum ada postingan disimpan"
+                  description="Postingan yang Anda simpan akan muncul di sini."
+                  actionLabel="Jelajahi Beranda"
+                  onAction={() => navigate('/')}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-0.5 mt-0.5">
+                {savedPosts.map(item => {
+                  const media = item.media?.[0];
+                  return (
+                    <Link
+                      key={item.id}
+                      to={`/posts/${item.id}`}
+                      className="relative aspect-square bg-surface-800 overflow-hidden group border border-surface-900"
+                    >
+                      {media?.media_type === 'video' ? (
+                        <video
+                          src={media.media_url}
+                          className="w-full h-full object-cover"
+                          muted
+                        />
+                      ) : (
+                        <img
+                          src={media?.media_url}
+                          alt="Thumbnail Saved Post"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      )}
+
+                      {media?.media_type === 'video' && (
+                        <div className="absolute top-2 right-2 bg-black/50 p-1 rounded-full text-white pointer-events-none">
+                          <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6 text-white font-bold text-xs select-none">
+                        <div className="flex items-center gap-1.5">
+                          <Heart className="h-4 w-4 fill-white" />
+                          {formatCount(item.likes_count ?? 0)}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MessageCircle className="h-4 w-4 fill-white" />
+                          {formatCount(item.comments_count ?? 0)}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )
           )}
         </div>
       )}
