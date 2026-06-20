@@ -85,7 +85,7 @@ src/
 | Fase | Scope | Status |
 |------|-------|--------|
 | 0 | Inisialisasi Proyek & Arsitektur Folder | ✅ Done |
-| 1 | Design System & Komponen Global | 🔜 |
+| 1 | Design System & Komponen Global | ✅ Done |
 | 2 | Modul Autentikasi (UI + Mock) | 🔜 |
 | 3 | Modul Profil & Relasi Sosial | 🔜 |
 | 4 | Modul Feed & Post | 🔜 |
