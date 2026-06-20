@@ -1,10 +1,13 @@
 import { createBrowserRouter, Outlet } from 'react-router-dom';
 
-// Pages — Placeholder skeletons for Phase 0
-// Each page will be fully implemented in its respective phase
+// Pages
 import LoginPage from '../pages/LoginPage';
 import RegisterPage from '../pages/RegisterPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
+import ResetPasswordPage from '../pages/ResetPasswordPage';
+import OtpVerifyPage from '../pages/OtpVerifyPage';
+import RecoverAccountPage from '../pages/RecoverAccountPage';
+
 import HomePage from '../pages/HomePage';
 import ProfilePage from '../pages/ProfilePage';
 import SearchPage from '../pages/SearchPage';
@@ -13,8 +16,9 @@ import NotificationPage from '../pages/NotificationPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import ShowcasePage from '../pages/ShowcasePage';
 
-// Layout wrapper (Navbar/Sidebar) added in Phase 1 (Design System)
+// Layout & Route Guards
 import PageContainer from '../components/layout/PageContainer';
+import ProtectedRoute from '../features/auth/ProtectedRoute';
 
 export const router = createBrowserRouter([
   // === Public routes (no auth required) ===
@@ -30,13 +34,27 @@ export const router = createBrowserRouter([
     path: '/forgot-password',
     element: <ForgotPasswordPage />,
   },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
+  },
+  {
+    path: '/verify-otp',
+    element: <OtpVerifyPage />,
+  },
+  {
+    path: '/recover-account',
+    element: <RecoverAccountPage />,
+  },
 
-  // === Protected routes (auth required — guard added in Phase 2) ===
+  // === Protected routes (auth required) ===
   {
     element: (
-      <PageContainer>
-        <Outlet />
-      </PageContainer>
+      <ProtectedRoute>
+        <PageContainer>
+          <Outlet />
+        </PageContainer>
+      </ProtectedRoute>
     ),
     children: [
       {
@@ -72,4 +90,5 @@ export const router = createBrowserRouter([
     element: <NotFoundPage />,
   },
 ]);
+
 

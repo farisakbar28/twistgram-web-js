@@ -11,4 +11,5 @@
  *   - notification.ts → Phase 6 (SRS 11.9)
  */
 
-export { authService } from './auth';
+export * from './auth';
+
