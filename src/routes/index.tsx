@@ -10,6 +10,10 @@ import RecoverAccountPage from '../pages/RecoverAccountPage';
 
 import HomePage from '../pages/HomePage';
 import ProfilePage from '../pages/ProfilePage';
+import EditProfilePage from '../pages/EditProfilePage';
+import FollowersPage from '../pages/FollowersPage';
+import FollowingPage from '../pages/FollowingPage';
+import FollowRequestsPage from '../pages/FollowRequestsPage';
 import SearchPage from '../pages/SearchPage';
 import ChatPage from '../pages/ChatPage';
 import NotificationPage from '../pages/NotificationPage';
@@ -74,8 +78,24 @@ export const router = createBrowserRouter([
         element: <NotificationPage />,
       },
       {
+        path: '/profile/edit',
+        element: <EditProfilePage />,
+      },
+      {
         path: '/profile/:username',
         element: <ProfilePage />,
+      },
+      {
+        path: '/profile/:username/followers',
+        element: <FollowersPage />,
+      },
+      {
+        path: '/profile/:username/following',
+        element: <FollowingPage />,
+      },
+      {
+        path: '/follow-requests',
+        element: <FollowRequestsPage />,
       },
       {
         path: '/showcase',
@@ -90,5 +110,6 @@ export const router = createBrowserRouter([
     element: <NotFoundPage />,
   },
 ]);
+
 
 
