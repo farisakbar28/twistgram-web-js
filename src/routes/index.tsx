@@ -26,6 +26,9 @@ import PostDetailPage from '../pages/PostDetailPage';
 import PageContainer from '../components/layout/PageContainer';
 import ProtectedRoute from '../features/auth/ProtectedRoute';
 
+// Dev-only showcase page - only accessible in development mode
+const ShowcaseRoute = import.meta.env.DEV ? <ShowcasePage /> : <NotFoundPage />;
+
 export const router = createBrowserRouter([
   // === Public routes (no auth required) ===
   {
@@ -107,11 +110,17 @@ export const router = createBrowserRouter([
         path: '/posts/:id',
         element: <PostDetailPage />,
       },
-      {
-        path: '/showcase',
-        element: <ShowcasePage />,
-      },
     ],
+  },
+
+  // === Dev-only routes (internal showcase, not for production) ===
+  {
+    path: '/showcase',
+    element: (
+      <ProtectedRoute>
+        <PageContainer>{ShowcaseRoute}</PageContainer>
+      </ProtectedRoute>
+    ),
   },
 
   // === Catch-all ===
@@ -120,6 +129,3 @@ export const router = createBrowserRouter([
     element: <NotFoundPage />,
   },
 ]);
-
-
-

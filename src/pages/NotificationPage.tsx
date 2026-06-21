@@ -12,6 +12,8 @@ import {
 import type { Notification } from '../types/index';
 import Avatar from '../components/common/Avatar';
 import Spinner from '../components/common/Spinner';
+import EmptyState from '../components/common/EmptyState';
+import Button from '../components/common/Button';
 import { useToast } from '../components/common/Toast';
 import { Bell, Check, CheckCircle2, XCircle } from 'lucide-react';
 import { formatRelativeTime } from '../utils';
@@ -28,15 +30,17 @@ const NotificationPage: React.FC = () => {
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
 
   const fetchNotifs = useCallback(async () => {
     if (!currentUser) return;
+    setError('');
     try {
       const data = await getNotifications(currentUser.id);
       setNotifications(data);
-    } catch (err) {
-      console.error('Failed to load notifications:', err);
+    } catch {
+      setError('Gagal memuat notifikasi.');
     } finally {
       setIsLoading(false);
     }
@@ -63,8 +67,8 @@ const NotificationPage: React.FC = () => {
       try {
         await markNotificationAsRead(notif.id, currentUser.id);
         fetchNotifs();
-      } catch (err) {
-        console.error('Failed to mark notification as read:', err);
+      } catch {
+        toast.error('Gagal menandai notifikasi sebagai terbaca.');
       }
     }
 
@@ -166,13 +170,15 @@ const NotificationPage: React.FC = () => {
         </div>
 
         {notifications.some(n => !n.is_read) && (
-          <button
+          <Button
             onClick={handleMarkAllRead}
-            className="text-[10px] text-brand-400 hover:text-brand-300 font-bold uppercase tracking-wider transition-colors flex items-center gap-1"
+            variant="ghost"
+            size="xs"
+            className="uppercase tracking-wider text-brand-400 hover:text-brand-300"
           >
             <Check className="h-3.5 w-3.5" />
             Tandai semua terbaca
-          </button>
+          </Button>
         )}
       </div>
 
@@ -216,16 +222,24 @@ const NotificationPage: React.FC = () => {
           <div className="flex justify-center items-center py-20">
             <Spinner size="md" className="text-brand-500" />
           </div>
+        ) : error ? (
+          <EmptyState
+            icon={<Bell className="h-10 w-10" />}
+            title="Notifikasi gagal dimuat"
+            description={error}
+            actionLabel="Coba Lagi"
+            onAction={fetchNotifs}
+          />
         ) : filteredNotifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-neutral-500 text-center select-none">
-            <Bell className="h-10 w-10 text-neutral-600 mb-3" />
-            <p className="text-sm font-semibold text-neutral-400">Tidak ada notifikasi</p>
-            <p className="text-xs text-neutral-500 mt-1">
-              {activeTab === 'all'
+          <EmptyState
+            icon={<Bell className="h-10 w-10" />}
+            title="Tidak ada notifikasi"
+            description={
+              activeTab === 'all'
                 ? 'Semua notifikasi aktivitas akun Anda akan muncul di sini.'
-                : 'Tidak ada notifikasi baru yang belum dibaca.'}
-            </p>
-          </div>
+                : 'Tidak ada notifikasi baru yang belum dibaca.'
+            }
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {filteredNotifications.map(notif => {
@@ -272,28 +286,31 @@ const NotificationPage: React.FC = () => {
                       onClick={e => e.stopPropagation()}
                       className="flex gap-2 shrink-0 self-end sm:self-center"
                     >
-                      <button
+                      <Button
                         onClick={e => {
                           e.stopPropagation();
                           handleFollowRequestAction(notif.id, notif.reference_id, 'approve');
                         }}
                         disabled={processingNotificationIdsRef.current.has(notif.id)}
-                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-brand-gradient text-white text-[10px] font-bold rounded-lg hover:opacity-95 active:scale-95 transition-all shadow-glow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        variant="primary"
+                        size="xs"
+                        className="shadow-glow-sm"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         Setujui
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={e => {
                           e.stopPropagation();
                           handleFollowRequestAction(notif.id, notif.reference_id, 'decline');
                         }}
                         disabled={processingNotificationIdsRef.current.has(notif.id)}
-                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-surface-800 hover:bg-surface-700 border border-surface-700 text-neutral-400 hover:text-neutral-200 text-[10px] font-bold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                        variant="secondary"
+                        size="xs"
                       >
                         <XCircle className="h-3.5 w-3.5" />
                         Tolak
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <span className="text-[10px] text-brand-400 group-hover:text-brand-300 font-semibold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity self-end sm:self-center mr-1 select-none">

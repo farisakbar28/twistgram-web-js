@@ -27,6 +27,7 @@ const HomePage: React.FC = () => {
   const { currentUser } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [feedError, setFeedError] = useState('');
 
   // Suggestions list
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
@@ -41,11 +42,12 @@ const HomePage: React.FC = () => {
   // Fetch feed posts
   const fetchFeed = useCallback(async () => {
     if (!currentUser) return;
+    setFeedError('');
     try {
       const feedPosts = await getFeed(currentUser.id);
       setPosts(feedPosts);
-    } catch (err) {
-      console.error('Gagal memuat feed postingan:', err);
+    } catch {
+      setFeedError('Gagal memuat feed postingan. Coba lagi.');
     } finally {
       setIsLoading(false);
     }
@@ -133,6 +135,14 @@ const HomePage: React.FC = () => {
           <div className="flex justify-center py-20">
             <Spinner size="lg" className="text-brand-500" />
           </div>
+        ) : feedError ? (
+          <EmptyState
+            icon={<Users className="h-10 w-10" />}
+            title="Feed gagal dimuat"
+            description={feedError}
+            actionLabel="Coba Lagi"
+            onAction={fetchFeed}
+          />
         ) : posts.length === 0 ? (
           <EmptyState
             icon={<Users className="h-10 w-10" />}

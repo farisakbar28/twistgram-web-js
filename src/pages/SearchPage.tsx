@@ -14,6 +14,7 @@ import Avatar from '../components/common/Avatar';
 import Spinner from '../components/common/Spinner';
 import Input from '../components/common/Input';
 import FollowButton from '../components/common/FollowButton';
+import EmptyState from '../components/common/EmptyState';
 import { Search, Hash, Users as UsersIcon, ArrowLeft, Heart, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useToast } from '../components/common/Toast';
@@ -40,6 +41,8 @@ const SearchPage: React.FC = () => {
   const [usersResult, setUsersResult] = useState<User[]>([]);
   const [tagsResult, setTagsResult] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [searchRetry, setSearchRetry] = useState(0);
   const [followTrigger, setFollowTrigger] = useState(0);
   const [followStatusMap, setFollowStatusMap] = useState<Record<string, FollowStatus>>({});
 
@@ -70,9 +73,11 @@ const SearchPage: React.FC = () => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [tagPosts, setTagPosts] = useState<Post[]>([]);
   const [isTagLoading, setIsTagLoading] = useState(false);
+  const [tagError, setTagError] = useState('');
 
   // Default suggestions
   const [defaultUsers, setDefaultUsers] = useState<User[]>([]);
+  const [defaultSuggestionsError, setDefaultSuggestionsError] = useState('');
 
   useEffect(() => {
     if (!currentUser) return;
@@ -106,6 +111,7 @@ const SearchPage: React.FC = () => {
     if (!currentUser) return;
     const fetchDefaultSuggestions = async () => {
       try {
+        setDefaultSuggestionsError('');
         const candidateUsernames = ['claraclarissa', 'andiwirawan', 'sitirahayu', 'budisantoso'];
         const suggestions = await Promise.all(
           candidateUsernames
@@ -134,8 +140,8 @@ const SearchPage: React.FC = () => {
         );
 
         setDefaultUsers(suggestions.filter(Boolean).slice(0, 4) as User[]);
-      } catch (err) {
-        console.error('Failed to load default search suggestions:', err);
+      } catch {
+        setDefaultSuggestionsError('Gagal memuat saran pengguna.');
       }
     };
     fetchDefaultSuggestions();
@@ -154,6 +160,7 @@ const SearchPage: React.FC = () => {
       }
 
       setIsLoading(true);
+      setSearchError('');
       try {
         if (activeTab === 'users') {
           const res = await searchUsers(q, currentUser.id);
@@ -162,8 +169,8 @@ const SearchPage: React.FC = () => {
           const res = await searchHashtags(q);
           setTagsResult(res);
         }
-      } catch (err) {
-        console.error('Search failed:', err);
+      } catch {
+        setSearchError('Gagal memuat hasil pencarian.');
       } finally {
         setIsLoading(false);
       }
@@ -174,7 +181,7 @@ const SearchPage: React.FC = () => {
     }, 300);
 
     return () => clearTimeout(delayDebounce);
-  }, [query, activeTab, currentUser, followTrigger]);
+  }, [query, activeTab, currentUser, followTrigger, searchRetry]);
 
   // Early return after all hooks — safe per React Rules of Hooks
   if (!currentUser) return null;
@@ -184,11 +191,12 @@ const SearchPage: React.FC = () => {
     if (!currentUser) return;
     setSelectedTag(tag);
     setIsTagLoading(true);
+    setTagError('');
     try {
       const posts = await getHashtagPosts(tag, currentUser.id);
       setTagPosts(posts);
-    } catch (err) {
-      console.error('Failed to load hashtag posts:', err);
+    } catch {
+      setTagError('Gagal memuat kiriman untuk tagar ini.');
     } finally {
       setIsTagLoading(false);
     }
@@ -226,12 +234,20 @@ const SearchPage: React.FC = () => {
           <div className="flex justify-center items-center py-32">
             <Spinner size="lg" className="text-brand-500" />
           </div>
+        ) : tagError ? (
+          <EmptyState
+            icon={<Hash className="h-12 w-12" />}
+            title="Tagar gagal dimuat"
+            description={tagError}
+            actionLabel="Coba Lagi"
+            onAction={() => void handleTagClick(selectedTag)}
+          />
         ) : tagPosts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-neutral-500 select-none text-center">
-            <Hash className="h-12 w-12 text-neutral-600 mb-3 animate-pulse" />
-            <p className="text-sm font-semibold text-neutral-400">Tidak ada kiriman</p>
-            <p className="text-xs text-neutral-500 mt-1">Belum ada kiriman publik dengan tag #{selectedTag} saat ini.</p>
-          </div>
+          <EmptyState
+            icon={<Hash className="h-12 w-12" />}
+            title="Tidak ada kiriman"
+            description={`Belum ada kiriman publik dengan tag #${selectedTag} saat ini.`}
+          />
         ) : (
           <div className="grid grid-cols-3 gap-1.5 sm:gap-4">
             {tagPosts.map(post => {
@@ -328,14 +344,23 @@ const SearchPage: React.FC = () => {
           <div className="flex justify-center items-center py-20">
             <Spinner size="md" className="text-brand-500" />
           </div>
+        ) : searchError ? (
+          <EmptyState
+            icon={activeTab === 'users' ? <UsersIcon className="h-10 w-10" /> : <Hash className="h-10 w-10" />}
+            title="Pencarian gagal dimuat"
+            description={searchError}
+            actionLabel="Coba Lagi"
+            onAction={() => setSearchRetry(prev => prev + 1)}
+          />
         ) : query.trim() ? (
           // Active Search Results
           activeTab === 'users' ? (
             usersResult.length === 0 ? (
-              <div className="text-center py-20 text-neutral-500 select-none">
-                <p className="text-sm font-semibold">Pengguna tidak ditemukan</p>
-                <p className="text-xs text-neutral-500 mt-1">Coba gunakan nama atau username lain.</p>
-              </div>
+              <EmptyState
+                icon={<UsersIcon className="h-10 w-10" />}
+                title="Pengguna tidak ditemukan"
+                description="Coba gunakan nama atau username lain."
+              />
             ) : (
               <div className="flex flex-col gap-4">
                 {usersResult.map(user => (
@@ -362,10 +387,11 @@ const SearchPage: React.FC = () => {
             )
           ) : (
             tagsResult.length === 0 ? (
-              <div className="text-center py-20 text-neutral-500 select-none">
-                <p className="text-sm font-semibold">Tagar tidak ditemukan</p>
-                <p className="text-xs text-neutral-500 mt-1">Belum ada postingan dengan tagar ini.</p>
-              </div>
+              <EmptyState
+                icon={<Hash className="h-10 w-10" />}
+                title="Tagar tidak ditemukan"
+                description="Belum ada postingan dengan tagar ini."
+              />
             ) : (
               <div className="flex flex-col gap-2">
                 {tagsResult.map(tag => (
@@ -392,28 +418,46 @@ const SearchPage: React.FC = () => {
             {activeTab === 'users' ? (
               <div className="flex flex-col gap-3">
                 <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider select-none">Saran Pengguna</span>
-                <div className="flex flex-col gap-3.5">
-                  {defaultUsers.map(user => (
-                    <div key={user.id} className="flex items-center justify-between p-3.5 bg-surface-900 border border-surface-800/60 rounded-xl">
-                      <Link to={`/profile/${user.username}`} className="flex items-center gap-3 group">
-                        <Avatar src={user.avatar_url} name={user.name} size="md" />
-                        <div className="flex flex-col text-left">
-                          <span className="text-xs font-bold text-neutral-100 group-hover:text-brand-400 transition-colors">
-                            {user.name}
-                          </span>
-                          <span className="text-[10px] text-neutral-400">
-                            @{user.username}
-                          </span>
+                {defaultSuggestionsError ? (
+                  <EmptyState
+                    icon={<UsersIcon className="h-10 w-10" />}
+                    title="Saran gagal dimuat"
+                    description={defaultSuggestionsError}
+                    actionLabel="Coba Lagi"
+                    onAction={() => setFollowTrigger(prev => prev + 1)}
+                  />
+                ) : (
+                  defaultUsers.length === 0 ? (
+                    <EmptyState
+                      icon={<UsersIcon className="h-10 w-10" />}
+                      title="Belum ada saran pengguna"
+                      description="Saran akun yang relevan akan muncul di sini."
+                    />
+                  ) : (
+                    <div className="flex flex-col gap-3.5">
+                      {defaultUsers.map(user => (
+                        <div key={user.id} className="flex items-center justify-between p-3.5 bg-surface-900 border border-surface-800/60 rounded-xl">
+                          <Link to={`/profile/${user.username}`} className="flex items-center gap-3 group">
+                            <Avatar src={user.avatar_url} name={user.name} size="md" />
+                            <div className="flex flex-col text-left">
+                              <span className="text-xs font-bold text-neutral-100 group-hover:text-brand-400 transition-colors">
+                                {user.name}
+                              </span>
+                              <span className="text-[10px] text-neutral-400">
+                                @{user.username}
+                              </span>
+                            </div>
+                          </Link>
+                          <FollowButton
+                            followStatus={getFollowStatus(user.id)}
+                            onFollow={() => handleFollow(user.id)}
+                            onUnfollow={() => handleUnfollow(user.id)}
+                          />
                         </div>
-                      </Link>
-                      <FollowButton
-                        followStatus={getFollowStatus(user.id)}
-                        onFollow={() => handleFollow(user.id)}
-                        onUnfollow={() => handleUnfollow(user.id)}
-                      />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )
+                )}
               </div>
             ) : (
               <div className="flex flex-col gap-3">

@@ -1,14 +1,12 @@
 /**
- * Axios HTTP client instance
- * 
- * Currently configured but NOT actively used — all data fetching
- * goes through services/mock/* in Phase 0–6.
- * 
- * In Phase 7 (API Integration), mock implementations in services/mock/
- * will be replaced with real axios calls using this instance,
- * WITHOUT changing component code (service contract remains identical).
- * 
+ * Axios HTTP client instance for backend API calls.
  * Ref: SRS section 11 — API endpoint contracts
+ *
+ * In mock mode (VITE_USE_MOCK=true), this client is available but not actively used.
+ * All data fetching goes through src/services/mock/* services.
+ *
+ * When backend is ready, mock services will be replaced with axios calls
+ * using this instance without changing UI components (service contract remains identical).
  */
 
 import axios from 'axios';

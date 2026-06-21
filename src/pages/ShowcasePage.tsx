@@ -1,3 +1,8 @@
+// ============================================================
+// ShowcasePage — Internal development component showcase
+// NOT for production; only accessible in DEV mode via /showcase route
+// ============================================================
+
 import React, { useState } from 'react';
 import {
   Lock,

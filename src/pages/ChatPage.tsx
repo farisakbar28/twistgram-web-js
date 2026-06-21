@@ -6,6 +6,9 @@ import type { ConversationWithMeta } from '../services';
 import type { Message, Story } from '../types/index';
 import Avatar from '../components/common/Avatar';
 import Spinner from '../components/common/Spinner';
+import EmptyState from '../components/common/EmptyState';
+import IconButton from '../components/common/IconButton';
+import Input from '../components/common/Input';
 import { useToast } from '../components/common/Toast';
 import {
   Send,
@@ -49,10 +52,12 @@ const ChatPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'main' | 'requests'>('main');
   const [isConvsLoading, setIsConvsLoading] = useState(true);
+  const [convsError, setConvsError] = useState('');
 
   // Messages states
   const [messages, setMessages] = useState<Message[]>([]);
   const [isMsgsLoading, setIsMsgsLoading] = useState(false);
+  const [msgsError, setMsgsError] = useState('');
   const [inputText, setInputText] = useState('');
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [showImageAttach, setShowImageAttach] = useState(false);
@@ -89,6 +94,7 @@ const ChatPage: React.FC = () => {
     async (silent = false) => {
       if (!currentUser) return;
       if (!silent) setIsConvsLoading(true);
+      if (!silent) setConvsError('');
 
       try {
         const data = await getConversations(currentUser.id);
@@ -128,8 +134,10 @@ const ChatPage: React.FC = () => {
             pendingConversationIdRef.current = null;
           }
         }
-      } catch (err) {
-        console.error('Failed to load conversations:', err);
+      } catch {
+        if (!silent) {
+          setConvsError('Gagal memuat daftar percakapan.');
+        }
       } finally {
         if (!silent) setIsConvsLoading(false);
       }
@@ -155,6 +163,7 @@ const ChatPage: React.FC = () => {
     const fetchMessagesList = async () => {
       if (!currentUser || !activeConv) return;
       setIsMsgsLoading(true);
+      setMsgsError('');
       try {
         const data = await getMessages(activeConv.id, currentUser.id);
         setMessages(data);
@@ -163,8 +172,8 @@ const ChatPage: React.FC = () => {
         lastActiveLastMessageIdRef.current = activeConv.last_message?.id ?? null;
 
         setTimeout(scrollToBottom, 50);
-      } catch (err) {
-        console.error('Failed to load messages:', err);
+      } catch {
+        setMsgsError('Gagal memuat isi percakapan.');
       } finally {
         setIsMsgsLoading(false);
       }
@@ -270,16 +279,26 @@ const ChatPage: React.FC = () => {
             <div className="flex justify-center items-center py-20">
               <Spinner size="sm" className="text-brand-500" />
             </div>
+          ) : convsError ? (
+            <EmptyState
+              icon={<MessageCircle className="h-8 w-8" />}
+              title="Percakapan gagal dimuat"
+              description={convsError}
+              actionLabel="Coba Lagi"
+              onAction={() => void fetchConvs()}
+              className="border-0 bg-transparent px-4 py-16"
+            />
           ) : currentTabConversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-neutral-500 text-center px-4 select-none">
-              <MessageCircle className="h-8 w-8 text-neutral-600 mb-2" />
-              <p className="text-xs font-semibold text-neutral-400">Tidak ada obrolan</p>
-              <p className="text-[10px] text-neutral-500 mt-0.5">
-                {activeTab === 'main'
+            <EmptyState
+              icon={<MessageCircle className="h-8 w-8" />}
+              title="Tidak ada obrolan"
+              description={
+                activeTab === 'main'
                   ? 'Obrolan aktif Anda akan muncul di sini.'
-                  : 'Permintaan pesan dari non-follower akan muncul di sini.'}
-              </p>
-            </div>
+                  : 'Permintaan pesan dari non-follower akan muncul di sini.'
+              }
+              className="border-0 bg-transparent px-4 py-16"
+            />
           ) : (
             currentTabConversations.map(conv => {
               const partner = conv.participants?.find(p => p.id !== currentUser.id);
@@ -374,6 +393,15 @@ const ChatPage: React.FC = () => {
                 <div className="flex justify-center items-center h-full">
                   <Spinner size="md" className="text-brand-500" />
                 </div>
+              ) : msgsError ? (
+                <EmptyState
+                  icon={<MessageCircle className="h-8 w-8" />}
+                  title="Percakapan gagal dimuat"
+                  description={msgsError}
+                  actionLabel="Coba Lagi"
+                  onAction={() => setActiveConv({ ...activeConv })}
+                  className="border-0 bg-transparent px-4 py-16"
+                />
               ) : (
                 <>
                   {messages.map(msg => {
@@ -493,59 +521,47 @@ const ChatPage: React.FC = () => {
 
                 {/* Text bar input */}
                 <div className="flex gap-2">
-                  <button
+                  <IconButton
                     type="button"
                     onClick={() => setShowImageAttach(!showImageAttach)}
-                    className={[
-                      'h-11 w-11 flex items-center justify-center rounded-xl border transition-all duration-200 shrink-0',
-                      showImageAttach
-                        ? 'bg-brand-500/10 border-brand-500/35 text-brand-400'
-                        : 'bg-surface-800 border-surface-700 text-neutral-400 hover:border-surface-600 hover:text-neutral-200',
-                    ].join(' ')}
-                    title="Lampirkan Gambar"
-                  >
-                    <Link2 className="h-4.5 w-4.5" />
-                  </button>
+                    variant={showImageAttach ? 'primary' : 'surface'}
+                    size="lg"
+                    label="Lampirkan gambar"
+                    icon={<Link2 className="h-4.5 w-4.5" />}
+                    className="shrink-0"
+                  />
 
-                  <input
-                    type="text"
+                  <Input
+                    id="chat-message-input"
                     placeholder="Ketik pesan Anda..."
                     value={inputText}
                     onChange={e => setInputText(e.target.value)}
-                    className="flex-1 bg-surface-800 border border-surface-700 rounded-xl px-4 py-3 text-xs text-neutral-50 placeholder-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
+                    className="flex-1"
                   />
 
-                  <button
+                  <IconButton
                     type="submit"
                     disabled={isSending || (!inputText.trim() && !imageUrlInput.trim())}
-                    className="h-11 w-11 flex items-center justify-center bg-brand-gradient text-white rounded-xl shadow-glow-sm hover:shadow-glow-md disabled:opacity-50 transition-all cursor-pointer shrink-0"
-                  >
-                    <SendHorizontal className="h-4.5 w-4.5" />
-                  </button>
+                    variant="primary"
+                    size="lg"
+                    label="Kirim pesan"
+                    icon={<SendHorizontal className="h-4.5 w-4.5" />}
+                    className="shrink-0 shadow-glow-sm"
+                  />
                 </div>
               </form>
             </div>
           </>
         ) : (
-          // Empty State - No active chat
-          <div className="flex-1 flex flex-col items-center justify-center text-neutral-500 text-center p-6 select-none animate-fade-in">
-            <div className="w-16 h-16 rounded-full bg-brand-500/10 border border-brand-500/15 flex items-center justify-center text-brand-400 shadow-glow-sm mb-4">
-              <Send className="h-8 w-8 -rotate-12 mt-[-4px]" />
-            </div>
-            <h2 className="text-base font-extrabold text-neutral-200">Pesan Anda</h2>
-            <p className="text-xs text-neutral-500 mt-1 max-w-[280px]">
-              Kirim pesan dan foto privat kepada teman atau keluarga secara instan dan aman di
-              Twistgram.
-            </p>
-            <button
-              onClick={() => {
-                // Navigate to search
-                window.location.pathname = '/search';
-              }}
-              className="mt-4 px-4 py-2 bg-brand-gradient text-white text-xs font-semibold rounded-xl shadow-glow-sm hover:shadow-glow-md transition-all cursor-pointer"
-            >
-              Cari Pengguna
-            </button>
+          <div className="flex-1 flex items-center justify-center p-6 animate-fade-in">
+            <EmptyState
+              icon={<Send className="h-8 w-8 -rotate-12" />}
+              title="Pesan Anda"
+              description="Kirim pesan dan foto privat kepada teman atau keluarga secara instan dan aman di Twistgram."
+              actionLabel="Cari Pengguna"
+              onAction={() => window.location.pathname = '/search'}
+              className="max-w-sm"
+            />
           </div>
         )}
       </div>

@@ -1,7 +1,10 @@
 import React from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Bell, Send } from 'lucide-react';
 import IconButton from '../common/IconButton';
+import { useAuth } from '../../features/auth/AuthContext';
+import { getUnreadMessagesCount, getUnreadNotificationsCount } from '../../services';
 
 // ============================================================
 // Component
@@ -10,10 +13,31 @@ import IconButton from '../common/IconButton';
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { currentUser } = useAuth();
+  const [notificationBadge, setNotificationBadge] = useState(0);
+  const [chatBadge, setChatBadge] = useState(0);
 
-  // Mock badge numbers for showcase purposes (will connect to real store in later phases)
-  const notificationBadge = 3;
-  const chatBadge = 5;
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchCounts = async () => {
+      try {
+        const [notificationCount, chatCount] = await Promise.all([
+          getUnreadNotificationsCount(currentUser.id),
+          getUnreadMessagesCount(currentUser.id),
+        ]);
+        setNotificationBadge(notificationCount);
+        setChatBadge(chatCount);
+      } catch {
+        setNotificationBadge(0);
+        setChatBadge(0);
+      }
+    };
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 4000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   return (
     <header className="sticky top-0 z-40 w-full h-16 bg-surface-950/80 backdrop-blur-md border-b border-surface-900/80 md:hidden flex items-center justify-between px-4 transition-all duration-200">

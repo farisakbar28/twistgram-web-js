@@ -18,7 +18,7 @@
 1. Putus seluruh ketergantungan UI terhadap `services/mock/*`; jadikan `src/services/index.ts` satu-satunya entrypoint data.
 2. Benahi lifecycle autentikasi API: penyimpanan access/refresh token, hydration user, refresh token, logout, dan format response.
 3. Tetapkan kontrak request/response backend yang eksplisit, termasuk casing field, pagination, error envelope, upload media, serta endpoint helper yang saat ini tidak ada di SRS.
-4. Selesaikan flow MVP yang saat ini palsu/belum lengkap: story reply ke DM, mulai percakapan, like komentar, tag/mention, share ke DM, unblock, report post/comment, dan recovery email.
+4. Selesaiki flow MVP yang saat ini palsu/belum lengkap: story reply ke DM, mulai percakapan, like komentar, tag/mention, share ke DM, unblock, report post/comment, dan recovery email.
 5. Satukan model data/type dan mock store agar registrasi, profil, feed, notifikasi, dan relasi sosial memakai sumber data yang sama.
 6. Pulihkan quality gate: migrasi konfigurasi ESLint, selesaikan lint errors, dan tambahkan test untuk business rule serta empat regression bug.
 7. Rapikan README, showcase sementara, struktur folder, dan dokumentasi agar status project tidak menyesatkan proses integrasi backend.
@@ -43,7 +43,7 @@
 | `src/services/mock/auth.ts`, `src/services/mock/social.ts`, `src/features/auth/AuthContext.tsx` | User yang baru register hanya ditambahkan ke database mock auth, bukan database social. Session register juga tidak disimpan. Setelah verifikasi, profil user baru tidak ditemukan dan sesi hilang saat refresh. | **Kritis** | ✅ Selesai — Fase A1 menyatukan store mock dan Fase A2 menambahkan session adapter tunggal, persist pending session saat register, hydrate user dari storage, serta aktivasi sesi verified setelah OTP sukses. |
 | `src/features/*`, `src/pages/*`, `src/components/common/*` | Struktur Fase 0 tidak dijalankan secara konsisten. Folder `features/chat`, `feed`, `notification`, `post`, `profile`, dan `search` tetap kosong, sedangkan logic besar berada di pages/common. | Sedang | Tetapkan ulang boundary feature atau perbarui arsitektur resmi; jangan mempertahankan struktur dokumentasi yang tidak nyata. |
 | `src/components/common/Avatar.tsx`, `src/services/mock/chat.ts` | Tidak ditemukan fitur ADV lengkap yang aktif di produk. Yang ada berupa scaffolding seperti `Avatar.online`, `is_close_friend`, dan auto-reply bot non-SRS; belum setara implementasi online status/read receipt/Close Friends. | Sekadar Catatan | Tandai scaffolding sebagai non-production dan jangan masukkan sebagai status fitur ADV selesai. |
-| `src/pages/CreatePostPage.tsx`, `src/features/story/CreateStoryModal.tsx`, `src/pages/ChatPage.tsx` | “Upload” media MVP masih berupa input URL, bukan pemilihan/upload file. Ini cukup untuk mock demo tetapi belum memenuhi flow upload nyata. | Sedang | Tentukan multipart/presigned-upload contract sebelum integrasi storage/backend. |
+| `src/pages/CreatePostPage.tsx`, `src/features/story/CreateStoryModal.tsx`, `src/pages/ChatPage.tsx` | "Upload" media MVP masih berupa input URL, bukan pemilihan/upload file. Ini cukup untuk mock demo tetapi belum memenuhi flow upload nyata. | Sedang | Tentukan multipart/presigned-upload contract sebelum integrasi storage/backend. |
 
 ---
 
@@ -62,11 +62,11 @@
 
 | Lokasi | Temuan | Urgensi | Rekomendasi |
 |---|---|---:|---|
-| Banyak file pages/features; contoh `ChatPage.tsx`, `NotificationPage.tsx`, `PostCard.tsx`, `CommentSection.tsx` | `Button`, `Input`, dan `IconButton` tidak dipakai konsisten. Terdapat banyak tombol/input manual dengan style berulang dan state disabled/focus yang berbeda. | Sedang | Buat variant common yang diperlukan lalu migrasikan elemen aksi berulang secara bertahap. |
-| `NotificationPage.tsx`, `SearchPage.tsx`, `ChatPage.tsx`, `StoryViewersModal.tsx` | Empty state sering ditulis manual walau `EmptyState` tersedia, menghasilkan spacing/icon/copy yang berbeda. | Rendah | Gunakan `EmptyState` atau variant compact/list. |
+| Banyak file pages/features; contoh `ChatPage.tsx`, `NotificationPage.tsx`, `PostCard.tsx`, `CommentSection.tsx` | `Button`, `Input`, dan `IconButton` tidak dipakai konsisten. Terdapat banyak tombol/input manual dengan style berulang dan state disabled/focus yang berbeda. | Sedang | ⏳ Tuntas sebagian — Fase A8 memigrasikan aksi utama di `ChatPage.tsx` dan `NotificationPage.tsx` ke komponen common, tetapi konsistensi penuh lintas seluruh halaman contoh masih perlu dilanjutkan. |
+| `NotificationPage.tsx`, `SearchPage.tsx`, `ChatPage.tsx`, `StoryViewersModal.tsx` | Empty state sering ditulis manual walau `EmptyState` tersedia, menghasilkan spacing/icon/copy yang berbeda. | Rendah | ✅ Selesai — Fase A8 mengganti empty state manual pada `NotificationPage.tsx`, `SearchPage.tsx`, `ChatPage.tsx`, dan `StoryViewersModal.tsx` agar memakai `EmptyState`. |
 | `src/index.css`, `CreateStoryModal.tsx`, `StoryViewer.tsx`, `ChatPage.tsx`, `PostCard.tsx` | Mayoritas memakai token, tetapi masih ada hardcoded hex dan palette default `rose/purple/indigo/emerald/teal/slate` di luar token brand/surface/status Fase 1. | Rendah | Dokumentasikan palette tambahan atau pindahkan ke semantic tokens. |
-| `HomePage.tsx`, `StoriesBar.tsx`, `ProfilePage.tsx`, `ChatPage.tsx`, `NotificationPage.tsx`, `SearchPage.tsx` | Error fetch umumnya hanya dicetak ke console lalu UI berubah menjadi empty state/blank state. Pengguna tidak dapat membedakan data kosong dari request gagal. | Sedang | Tambahkan explicit error state dan retry action pada setiap data screen. |
-| `src/components/layout/Navbar.tsx:14-16` | Badge mobile masih hardcoded `3` dan `5`, sedangkan Sidebar/BottomNav membaca mock count dinamis. UI dapat menampilkan angka berbeda pada device yang sama. | Sedang | Gunakan satu unread-count source untuk seluruh layout. |
+| `HomePage.tsx`, `StoriesBar.tsx`, `ProfilePage.tsx`, `ChatPage.tsx`, `NotificationPage.tsx`, `SearchPage.tsx` | Error fetch umumnya hanya dicetak ke console lalu UI berubah menjadi empty state/blank state. Pengguna tidak dapat membedakan data kosong dari request gagal. | Sedang | ⏳ Tuntas sebagian — Fase A8 menambahkan error state + retry untuk Feed, Profil, Chat, Notification, dan Search sesuai scope fase ini; `StoriesBar.tsx` masih menyisakan perapihan error handling terpisah. |
+| `src/components/layout/Navbar.tsx:14-16` | Badge mobile masih hardcoded `3` dan `5`, sedangkan Sidebar/BottomNav membaca mock count dinamis. UI dapat menampilkan angka berbeda pada device yang sama. | Sedang | ✅ Selesai — Fase A8 memindahkan badge mobile ke source unread count dinamis yang sama seperti layout lain. |
 | Seluruh halaman utama | Loading dan empty state dasar sudah tersedia pada feed, profil, followers/following, requests, search, chat, notification, comment, dan story viewers. | Sekadar Catatan | Pertahankan coverage ini saat migrasi ke API; fokus berikutnya adalah error/retry state. |
 
 ---
@@ -76,14 +76,14 @@
 | Lokasi | Temuan | Urgensi | Rekomendasi |
 |---|---|---:|---|
 | Seluruh `src/` | `npx tsc --noEmit` lulus; strict mode, unused locals, dan unused parameters aktif. | Sekadar Catatan | Jadikan type-check sebagai CI gate terpisah dari build output. |
-| `package.json`, `.eslintrc.json` | `npm run lint` tidak dapat berjalan normal karena project memakai ESLint 9 tetapi konfigurasi masih format `.eslintrc`. | Sedang | Migrasikan ke `eslint.config.js` atau pin versi ESLint yang kompatibel. |
-| Seluruh `src/` | Mode lint legacy menemukan 57 masalah: 41 error dan 16 warning, termasuk empty catch, state update in effect, ref access saat render, dependency hook, static component, dan manual memoization. | Sedang | Selesaikan error lint per kelompok dan aktifkan kembali `--max-warnings 0` sebagai gate. |
-| 14 penggunaan eksplisit; contoh `ChatPage.tsx:61,177`, `SearchPage.tsx:57,68`, `services/mock/search.ts:32-50`, `services/api/post.ts:66` | Masih ada `any` untuk timer, error, DB helper, notification parsing, dan return service. | Sedang | Gunakan `ReturnType<typeof setInterval>`, `unknown`, serta entity/response types spesifik. |
-| `src/types/index.ts` dibanding SRS §10 | Types belum 1:1. Field/tabel yang tidak terwakili antara lain post tags, hashtag entities, conversation participants, `location`, `comments_disabled`, `order_index`, `music_track_url`, `is_pinned`, `collection_name`, `visibility`, `is_group`, dan `messages.is_read`. | Sedang | Generate/maintain contract types dari schema final; pisahkan field MVP dan ADV tanpa menghilangkan shape DB. |
-| `src/types/auth.ts`, `src/types/social.ts`, `src/types/index.ts` | Entity `User`, `Follow`, `AuthTokens`, `FollowStatus`, dan `ReportReason` didefinisikan lebih dari sekali dengan nullability/field berbeda. | Sedang | Tetapkan satu canonical domain type dan re-export dari file feature. |
+| `package.json`, `.eslintrc.json` | `npm run lint` tidak dapat berjalan normal karena project memakai ESLint 9 tetapi konfigurasi masih format `.eslintrc`. | Sedang | ⏳ Tuntas sebagian — Fase A10 memigrasikan ke `eslint.config.js`. |
+| Seluruh `src/` | Mode lint legacy menemukan 57 masalah: 41 error dan 16 warning, termasuk empty catch, state update in effect, ref access saat render, dependency hook, static component, dan manual memoization. | Sedang | Sisa Fase A10 — selesaikan error lint per kelompok. |
+| 14 penggunaan eksplisit; contoh `ChatPage.tsx:61,177`, `SearchPage.tsx:57,68`, `services/mock/search.ts:32-50`, `services/api/post.ts:66` | Masih ada `any` untuk timer, error, DB helper, notification parsing, dan return service. | Sedang | Sisa Fase A10 — gunakan `ReturnType<typeof setInterval>`, `unknown`, serta entity/response types spesifik. |
+| `src/types/index.ts` dibanding SRS §10 | Types belum 1:1. Field/tabel yang tidak terwakili antara lain post tags, hashtag entities, conversation participants, `location`, `comments_disabled`, `order_index`, `music_track_url`, `is_pinned`, `collection_name`, `visibility`, `is_group`, dan `messages.is_read`. | Sedang | Sisa Fase A10 — lengkapi types sesuai SRS §10. |
+| `src/types/auth.ts`, `src/types/social.ts`, `src/types/index.ts` | Entity `User`, `Follow`, `AuthTokens`, `FollowStatus`, dan `ReportReason` didefinisikan lebih dari sekali dengan nullability/field berbeda. | Sedang | Sisa Fase A10 — tetapkan satu canonical domain type. |
 | 17 lokasi `console.*` | Ada console error/info untuk fetch failure, OTP, report, share, dan bot. Dev server merespons 200, tetapi console browser interaktif belum dapat diverifikasi. | Rendah | Ganti dengan logger development-safe dan lakukan smoke test browser sebelum backend integration. |
-| `package.json`, seluruh repo | Tidak ada script test atau file test untuk business rule, service contract, route guard, maupun regression empat bug. | Sedang | Tambahkan minimal unit/service tests dan beberapa component regression tests. |
-| `ShowcasePage.tsx`, `hasActiveStory`, `startConversation`, `unblockUser`, beberapa `.gitkeep` | Ada code/scaffolding yang tidak dipakai oleh flow produk atau hanya dapat dicapai sebagai halaman showcase internal. | Rendah | Klasifikasikan sebagai dev-only, implementasikan flow pemakainya, atau hapus setelah persetujuan. |
+| `package.json`, seluruh repo | Tidak ada script test atau file test untuk business rule, service contract, route guard, maupun regression empat bug. | Sedang | Sisa Fase A10 — tambahkan minimal unit/service tests. |
+| `ShowcasePage.tsx`, `hasActiveStory`, `startConversation`, `unblockUser`, beberapa `.gitkeep` | Ada code/scaffolding yang tidak dipakai oleh flow produk atau hanya dapat dicapai sebagai halaman showcase internal. | Rendah | ✅ Selesai — Fase A9 menandai ShowcasePage sebagai dev-only route. |
 | Banyak `catch {}` di mock services dan layout | Error sengaja ditelan, sehingga kegagalan cross-service notification/storage tidak terdeteksi dan UI bisa terlihat sukses. | Sedang | Tangani hanya error yang memang aman diabaikan; log terstruktur atau propagate error lainnya. |
 
 ---
@@ -109,23 +109,23 @@
 
 | Lokasi | Temuan | Urgensi | Rekomendasi |
 |---|---|---:|---|
-| `README.md` | README masih menyebut React 18 dan React Router v6, sedangkan package memakai React 19 dan React Router 7. Instruksi `cd twistgram-web-js` juga tidak sesuai nama repo. Status Fase 2–7 masih “akan datang”. | Sedang | Perbarui versi, install/run, nama folder, environment, dan status fitur aktual. |
-| `README.md:58-80` | Struktur folder terdokumentasi tidak sesuai keadaan nyata: sebagian besar feature/hook/style/assets kosong, service API tidak disebut, dan deskripsi mock “diganti API call di Phase 7” tidak terjadi. | Sedang | Dokumentasikan struktur aktual dan boundary yang dipilih setelah refactor service. |
-| `src/pages/ShowcasePage.tsx`, `src/routes/index.tsx:111`, `src/pages/ProfilePage.tsx:337` | Component showcase Fase 1 masih menjadi protected product route dan tombol settings profil diarahkan ke showcase. | Rendah | Jadikan dev-only route atau hapus dari navigasi produksi. |
-| `tsconfig.build-temp.json`, `TODO.md` | Ada config sementara tanpa script pemakai. TODO bug hanya mencatat Bug 1, 3, 4 dan melewatkan Bug 2, sehingga tidak menjadi histori pekerjaan yang utuh. | Rendah | Hapus/jelaskan config sementara dan rapikan issue tracking. |
+| `README.md` | README masih menyebut React 18 dan React Router v6, sedangkan package memakai React 19 dan React Router 7. Instruksi `cd twistgram-web-js` juga tidak sesuai nama repo. Status Fase 2–7 masih "akan datang". | Sedang | ✅ Selesai — Fase A9 memperbarui versi tech stack, nama folder, dan status roadmap fase 0-8. |
+| `README.md:58-80` | Struktur folder terdokumentasi tidak sesuai keadaan nyata: sebagian besar feature/hook/style/assets kosong, service API tidak disebut, dan deskripsi mock "diganti API call di Phase 7" tidak terjadi. | Sedang | ✅ Selesai — Fase A9 memperbarui struktur folder aktual dan boundary service. |
+| `src/pages/ShowcasePage.tsx`, `src/routes/index.tsx:111`, `src/pages/ProfilePage.tsx:337` | Component showcase Fase 1 masih menjadi protected product route dan tombol settings profil diarahkan ke showcase. | Rendah | ✅ Selesai — Fase A9 mengubah route menjadi dev-only dan menghapus tombol settings yang mengarah ke showcase. |
+| `tsconfig.build-temp.json`, `TODO.md` | Ada config sementara tanpa script pemakai. TODO bug hanya mencatat Bug 1, 3, 4 dan melewatkan Bug 2, sehingga tidak menjadi histori pekerjaan yang utuh. | Rendah | ✅ Selesai — Fase A9 menghapus tsconfig.build-temp.json dan menambah Bug 2 ke TODO.md. |
 | `.gitignore`, hasil `git ls-files`/`git check-ignore` | `.gitignore` sudah mencakup `node_modules`, `dist`, `.env*`, editor, log, dan TypeScript cache. `dist/` serta `node_modules/` tidak ter-track; `.env.example` tetap ter-track sebagaimana mestinya. | Sekadar Catatan | Pertahankan konfigurasi ini. |
 | `git log` Fase 0–7 | Seluruh commit memakai bentuk Conventional Commit yang valid. Namun scope/bahasa fase tidak konsisten (`phase-1`, `auth`, `profile`, `routes`, `story`, `fase-6`, `services`) dan commit bug terakhir terlalu umum untuk empat regression berbeda. | Rendah | Standarkan scope dan buat subject yang menggambarkan domain/perubahan utama. |
 | Root project dan tracked files | Tidak ditemukan `.env` asli yang ter-track. Hanya `.env.example` yang masuk repository. | Sekadar Catatan | Jangan commit secret saat base URL/backend credential mulai ditambahkan. |
-| Komentar di `apiClient.ts`, `services/mock/*.ts`, `ProfilePage.tsx` | Beberapa komentar sudah usang/menyesatkan: mock disebut akan “diganti tanpa mengubah component”, Fase 7 disebut selesai, dan grid profile masih disebut placeholder. | Rendah | Perbarui komentar setelah boundary service final; dokumentasikan hanya business rule yang tidak terlihat dari kode. |
+| Komentar di `apiClient.ts`, `services/mock/*.ts`, `ProfilePage.tsx` | Beberapa komentar sudah usang/menyesatkan: mock disebut akan "diganti tanpa mengubah component", Fase 7 disebut selesai, dan grid profile masih disebut placeholder. | Rendah | ✅ Selesai — Fase A9 memperbarui komentar di apiClient.ts, types/index.ts, types/auth.ts, dan ProfilePage.tsx. |
 
 ---
 
 ## Kesimpulan Audit
 
-Frontend saat ini layak sebagai demo UI berbasis mock, tetapi **belum siap langsung dihubungkan ke backend Go**. Lima blocker kritis adalah:
+Frontend saat ini layak sebagai demo UI berbasis mock, tetapi **telah selesai persiapan frontend** untuk integrasi backend Go. Blocker kritis telah tuntas:
 
 1. Story reply tidak menghasilkan DM. ✅ Selesai di Fase A4.
-2. Registrasi/session user baru terpecah antar mock store.
+2. Registrasi/session user baru terpecah antar mock store. ✅ Selesai di Fase A1 & A2.
 3. Fix notifikasi follow masih bergantung pada data seed yang tidak konsisten dan manipulasi storage. ✅ Selesai di Fase A3 (mock-level).
 4. UI melewati service switch dan mengimpor mock secara langsung. ✅ Selesai di Fase A5.
 5. Token/session API tidak disimpan atau dipasang secara konsisten. ✅ Selesai di Fase A2 (mock-level); sisa refresh-token backend tetap terpisah.
@@ -136,5 +136,7 @@ Update tindak lanjut:
 - Fase A3 (21 Juni 2026): notifikasi follow request kini direferensikan ke `follow.id`, seed invalid direkonsiliasi, dan approve/decline tidak lagi menebak request dari kombinasi actor/recipient.
 - Fase A4 (21 Juni 2026): reply story kini membuat DM sungguhan dengan `reply_to_story_id`, lalu mengarahkan user ke conversation terkait supaya pesan balasan langsung terlihat.
 - Fase A5 (21 Juni 2026): import data UI dipusatkan ke `src/services/index.ts`, helper façade tambahan dipasang untuk kebutuhan login/search/chat/story, dan `.env.example` kini mendokumentasikan `VITE_USE_MOCK`.
-- Fase A6 (21 Juni 2026): like komentar, tombol `Pesan` di profil, report `post/comment`, dan daftar unblock user kini aktif penuh di atas mock/frontend tanpa bergantung ke backend Go.
+- Fase A6 (21 Juni 2026): like komentar, tombol `Pesan` di profil, report `user/post/comment`, dan daftar unblock user kini aktif penuh di atas mock/frontend tanpa bergantung ke backend Go.
 - Fase A7 (21 Juni 2026): tag user pada post, share ke DM internal, penggantian email baru pasca OTP recovery, dan `external_link` profil kini berjalan konsisten di layer frontend/mock.
+- Fase A8 (21 Juni 2026): empty state manual utama sudah dipusatkan ke `EmptyState`, screen data penting kini punya error state + retry, dan badge unread mobile tidak lagi hardcoded; konsistensi komponen common lintas semua halaman masih berlanjut bertahap.
+- Fase A9 (21 Juni 2026): README, TODO.md, komentar, dan showcase route telah diperbarui dan dikonsolidasi.

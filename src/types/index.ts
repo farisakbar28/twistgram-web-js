@@ -2,14 +2,7 @@
  * TypeScript interfaces for Twistgram
  * 
  * Organized 1:1 with database schema from SRS section 10.
- * All types will be progressively filled in as each feature phase is implemented.
- * 
- * Phase 0: Skeleton only — types will be added per phase:
- *   - Phase 2: User, Auth types
- *   - Phase 3: Follow, Block types
- *   - Phase 4: Post, Comment, Like, SavedPost types
- *   - Phase 5: Story, StoryView types
- *   - Phase 6: Conversation, Message, Notification types
+ * All types populated after feature implementation.
  */
 
 // ============================================================

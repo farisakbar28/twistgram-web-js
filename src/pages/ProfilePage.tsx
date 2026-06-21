@@ -8,13 +8,11 @@
  * - Own profile: tombol Edit Profil, link ke Follow Requests (jika privat)
  * - Other profile: FollowButton, tombol More (Block, Report)
  * - SOC-01: akun privat → konten terkunci untuk non-follower
- * - Grid post placeholder (diisi di Fase 4)
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  Settings,
   MoreHorizontal,
   Lock,
   Grid3X3,
@@ -257,10 +255,10 @@ const ProfilePage: React.FC = () => {
       <div className="flex items-center justify-center min-h-[60vh] p-4">
         <EmptyState
           icon={<UserX className="h-10 w-10" />}
-          title="Profil tidak ditemukan"
+          title={error ? 'Profil gagal dimuat' : 'Profil tidak ditemukan'}
           description={error || 'Pengguna ini tidak ada atau sudah menghapus akunnya.'}
-          actionLabel="Kembali"
-          onAction={() => navigate(-1)}
+          actionLabel={error ? 'Coba Lagi' : 'Kembali'}
+          onAction={error ? loadProfile : () => navigate(-1)}
         />
       </div>
     );
@@ -382,26 +380,17 @@ const ProfilePage: React.FC = () => {
                   Permintaan
                 </Button>
               )}
-              <Button
-                variant="secondary"
-                size="sm"
-                leftIcon={<Ban className="h-3.5 w-3.5" />}
-                onClick={openBlockedUsers}
-                className="shrink-0"
-              >
-                Diblokir
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/showcase')}
-                className="shrink-0 px-3"
-                aria-label="Settings"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
+<Button
+                 variant="secondary"
+                 size="sm"
+                 leftIcon={<Ban className="h-3.5 w-3.5" />}
+                 onClick={openBlockedUsers}
+                 className="shrink-0"
+               >
+                 Diblokir
+               </Button>
+             </>
+           ) : (
             /* Other profile actions */
             <>
               <div className="flex-1">

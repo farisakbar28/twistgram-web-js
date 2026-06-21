@@ -5,6 +5,7 @@ import type { StoryView } from '../../types/index';
 import Modal from '../../components/common/Modal';
 import Avatar from '../../components/common/Avatar';
 import Spinner from '../../components/common/Spinner';
+import EmptyState from '../../components/common/EmptyState';
 import { Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -30,16 +31,18 @@ export const StoryViewersModal: React.FC<StoryViewersModalProps> = ({
   const { currentUser } = useAuth();
   const [viewers, setViewers] = useState<StoryView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchViewers = async () => {
       if (!currentUser || !storyId) return;
       setIsLoading(true);
+      setError('');
       try {
         const data = await getStoryViewers(storyId, currentUser.id);
         setViewers(data);
-      } catch (err) {
-        console.error('Gagal mengambil penonton story:', err);
+      } catch {
+        setError('Gagal memuat daftar penonton cerita.');
       } finally {
         setIsLoading(false);
       }
@@ -62,14 +65,29 @@ export const StoryViewersModal: React.FC<StoryViewersModalProps> = ({
           <div className="flex justify-center items-center h-[200px]">
             <Spinner size="md" className="text-brand-500" />
           </div>
+        ) : error ? (
+          <EmptyState
+            icon={<Users className="h-8 w-8" />}
+            title="Daftar penonton gagal dimuat"
+            description={error}
+            actionLabel="Coba Lagi"
+            onAction={() => {
+              setIsLoading(true);
+              setError('');
+              void getStoryViewers(storyId, currentUser!.id)
+                .then(setViewers)
+                .catch(() => setError('Gagal memuat daftar penonton cerita.'))
+                .finally(() => setIsLoading(false));
+            }}
+            className="h-[200px] border-0 bg-transparent p-4"
+          />
         ) : viewers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[200px] text-neutral-500 text-center p-4">
-            <Users className="h-8 w-8 text-neutral-600 mb-2 animate-pulse" />
-            <p className="text-xs font-semibold text-neutral-400">Belum ada penonton</p>
-            <p className="text-[10px] text-neutral-500 mt-1">
-              Cerita Anda akan menampilkan daftar pengguna yang melihatnya di sini.
-            </p>
-          </div>
+          <EmptyState
+            icon={<Users className="h-8 w-8" />}
+            title="Belum ada penonton"
+            description="Cerita Anda akan menampilkan daftar pengguna yang melihatnya di sini."
+            className="h-[200px] border-0 bg-transparent p-4"
+          />
         ) : (
           <div className="flex flex-col gap-3.5">
             {viewers.map((view) => {

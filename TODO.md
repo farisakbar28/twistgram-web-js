@@ -4,10 +4,14 @@
 
 - [x] `src/components/common/Avatar.tsx`: benarkan border/ring persegi dengan menambahkan `rounded-full overflow-hidden` pada wrapper avatar
 
+## BUG 2 (done)
+
+- [x] `src/pages/NotificationPage.tsx`: tombol Setujui/Tolak pada notifikasi follow request tidak berfungsi karena seed data `notif-004` tidak konsisten dengan `mockFollows`. Diperbaiki dengan mereferensikan notifikasi ke `follow.id` sebagai `reference_id` dan mekanisme approve/decline yang akurat.
+
 ## BUG 3 (done)
 
 - [x] `src/pages/ChatPage.tsx`: hentikan spinner flicker dengan mempersempit dependency `useEffect` pemuatan pesan menjadi `activeConv?.id` saja
 
 ## BUG 4 (done)
 
-- [x] `src/pages/NotificationPage.tsx`: hilangkan notifikasi follow_request setelah Setujui/Tolak (tombol langsung menghilang, tanpa toast “sudah diproses sebelumnya” saat diklik ulang)
+- [x] `src/pages/NotificationPage.tsx`: hilangkan notifikasi follow_request setelah Setujui/Tolak (tombol langsung menghilang, tanpa toast "sudah diproses sebelumnya" saat diklik ulang)

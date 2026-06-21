@@ -1,9 +1,6 @@
 /**
  * Auth & User TypeScript interfaces
  * Ref: SRS §3 (Authentication), §10.1 (tabel users)
- *
- * Catatan: field berlabel [ADV] tetap ada di interface agar
- * shape-nya kompatibel dengan skema DB, namun belum dipakai di UI.
  */
 
 // ============================================================
