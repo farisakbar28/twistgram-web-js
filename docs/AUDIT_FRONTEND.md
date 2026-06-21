@@ -54,7 +54,7 @@
 | Avatar persegi | **Terverifikasi selesai** | Root cause pada wrapper `Avatar` sudah diperbaiki dengan `rounded-full overflow-hidden`. Pencarian seluruh `<img>` tidak menemukan avatar user lain yang dirender sebagai `<img>` langsung; `<img>` tersisa adalah media post/story/chat/preview. | Sekadar Catatan | Tambahkan visual regression test untuk seluruh ukuran avatar dan story ring. |
 | Tombol Detail → Follow di Beranda | **Selesai untuk mock, belum backend-ready** | `FollowButton` sekarang menggantikan link Detail dan state di-refresh. Namun handler masih dynamic-import langsung ke mock dan seluruh error ditelan, sehingga gagal follow dapat terlihat seperti tidak terjadi apa-apa. | Sedang | Gunakan service entrypoint dan tampilkan feedback error/sukses yang konsisten. |
 | Spinner flicker di chat | **Root cause utama terselesaikan** | Dependency fetch message dipersempit ke `activeConv?.id`; polling tidak lagi memicu spinner setiap object conversation berubah. Masih ada warning dependency lint dan potensi race antara polling conversation dengan fetch message. | Rendah | Pertahankan loading hanya saat conversation ID berubah dan tambahkan request cancellation/race guard. |
-| Notifikasi follow tidak update | **Belum menyelesaikan root cause secara penuh** | Optimistic removal dan penghapusan localStorage bekerja untuk request yang valid. Namun seed `notif-004` menyatakan `user-005 → user-001`, sementara tidak ada follow request tersebut di `mockFollows`; klik akan menghilangkan kartu tanpa mengubah relasi. Fix juga memanipulasi localStorage dari social service dan tidak berlaku otomatis pada API asli. | **Kritis** | Selaraskan data sumber, identifikasi request dengan `reference_id/request_id`, dan jadikan backend mengembalikan state notifikasi terbaru secara atomik. |
+| Notifikasi follow tidak update | **✅ Selesai untuk mock-level (Fase A3)** | Seed follow request kini direkonsiliasi terhadap relasi `mockFollows` yang benar-benar `pending`, notifikasi `follow_request` memakai `reference_id = follow.id`, dan aksi Setujui/Tolak memproses request berdasarkan identifier itu alih-alih menebak dari actor. Manipulasi localStorage langsung dari social service juga sudah dihapus. | **Kritis** | Untuk backend asli nanti, response notifikasi/follow request tetap perlu dibuat atomik di server, tetapi blocker mock/frontend-nya sudah selesai. |
 
 ---
 
@@ -126,10 +126,11 @@ Frontend saat ini layak sebagai demo UI berbasis mock, tetapi **belum siap langs
 
 1. Story reply tidak menghasilkan DM.
 2. Registrasi/session user baru terpecah antar mock store.
-3. Fix notifikasi follow masih bergantung pada data seed yang tidak konsisten dan manipulasi storage.
+3. Fix notifikasi follow masih bergantung pada data seed yang tidak konsisten dan manipulasi storage. ✅ Selesai di Fase A3 (mock-level).
 4. UI melewati service switch dan mengimpor mock secara langsung.
 5. Token/session API tidak disimpan atau dipasang secara konsisten. ✅ Selesai di Fase A2 (mock-level); sisa refresh-token backend tetap terpisah.
 
 Update tindak lanjut:
 - Fase A1 (21 Juni 2026): store mock terpusat sudah dibuat di `src/services/mock/database.ts`; temuan duplikasi data mock selesai dan blocker registrasi lintas store turun menjadi sisa masalah session/hydration yang dijadwalkan ke Fase A2.
 - Fase A2 (21 Juni 2026): session adapter tunggal sudah dipakai oleh mock auth, AuthContext, OTP verification, dan `apiClient`; register/verify/login/logout kini konsisten di atas storage yang sama.
+- Fase A3 (21 Juni 2026): notifikasi follow request kini direferensikan ke `follow.id`, seed invalid direkonsiliasi, dan approve/decline tidak lagi menebak request dari kombinasi actor/recipient.

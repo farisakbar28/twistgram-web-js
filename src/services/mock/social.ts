@@ -196,7 +196,8 @@ export const followUser = async (
     await createNotification(
       targetUserId,
       currentUserId,
-      target.is_private ? 'follow_request' : 'follow'
+      target.is_private ? 'follow_request' : 'follow',
+      target.is_private ? newFollow.id : undefined
     );
   } catch {
     // ignore mock notification failure
@@ -274,30 +275,17 @@ export const getFollowRequests = async (currentUserId: string): Promise<FollowRe
     .filter(Boolean) as FollowRequest[];
 };
 
-const removeFollowRequestNotification = (follow: MockFollow) => {
-  const filtered = mockDb.notifications.filter(
-    (notification) =>
-      !(
-        notification.type === 'follow_request' &&
-        notification.actor_id === follow.follower_id &&
-        notification.recipient_id === follow.following_id
-      )
-  );
-
-  mockDb.notifications.splice(0, mockDb.notifications.length, ...filtered);
-};
-
 export const approveFollowRequest = async (requestId: string): Promise<void> => {
   await delay(400);
   const follow = mockFollows.find((entry) => entry.id === requestId);
   if (!follow || follow.status !== 'pending') throw new Error('Permintaan tidak ditemukan.');
 
   follow.status = 'accepted';
-  removeFollowRequestNotification(follow);
   persistMockDb();
 
   try {
-    const { createNotification } = await import('./notification');
+    const { createNotification, syncFollowRequestNotifications } = await import('./notification');
+    syncFollowRequestNotifications();
     await createNotification(follow.follower_id, follow.following_id, 'follow');
   } catch {
     // ignore mock notification failure
@@ -313,8 +301,14 @@ export const declineFollowRequest = async (requestId: string): Promise<void> => 
     (entry) => entry.id === requestId && entry.status === 'pending'
   );
   mockFollows.splice(index, 1);
-  removeFollowRequestNotification(follow);
   persistMockDb();
+
+  try {
+    const { syncFollowRequestNotifications } = await import('./notification');
+    syncFollowRequestNotifications();
+  } catch {
+    // ignore mock notification failure
+  }
 };
 
 export const blockUser = async (

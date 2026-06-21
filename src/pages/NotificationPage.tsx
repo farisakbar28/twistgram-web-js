@@ -6,7 +6,6 @@ import {
   markAllNotificationsAsRead,
 } from '../services/mock/notification';
 import {
-  getFollowRequests,
   approveFollowRequest,
   declineFollowRequest,
 } from '../services/mock/social';
@@ -89,9 +88,14 @@ const NotificationPage: React.FC = () => {
 
   const handleFollowRequestAction = async (
     notificationId: string,
-    actorId: string,
+    requestId: string | undefined,
     action: 'approve' | 'decline'
   ) => {
+    if (!requestId) {
+      toast.error('Notifikasi permintaan follow tidak memiliki reference request yang valid.');
+      return;
+    }
+
     // Idempotency guard
     if (processingNotificationIdsRef.current.has(notificationId)) return;
     processingNotificationIdsRef.current.add(notificationId);
@@ -103,25 +107,15 @@ const NotificationPage: React.FC = () => {
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
 
     try {
-      // Find follow request id corresponding to the actor
-      const requests = await getFollowRequests(currentUser.id);
-      const matched = requests.find(r => r.from_user?.id === actorId);
-
-      if (!matched) {
-        // Jika already processed oleh invocation lain, jangan tampilkan toast pada klik pertama.
-        // Karena kita sudah optimistic-hide, kondisi ini biasanya terjadi jika handler ke-trigger ganda.
-        return;
-      }
-
       if (action === 'approve') {
-        await approveFollowRequest(matched.id);
+        await approveFollowRequest(requestId);
         toast.success('Permintaan follow disetujui.');
       } else {
-        await declineFollowRequest(matched.id);
+        await declineFollowRequest(requestId);
         toast.success('Permintaan follow ditolak.');
       }
 
-      // Tidak memanggil fetchNotifs() agar kartu follow_request tidak “balik” dari storage
+      fetchNotifs();
     } catch (err: any) {
       // Jika gagal, kembalikan kartu agar user bisa retry
       if (original) {
@@ -281,7 +275,7 @@ const NotificationPage: React.FC = () => {
                       <button
                         onClick={e => {
                           e.stopPropagation();
-                          handleFollowRequestAction(notif.id, notif.actor_id, 'approve');
+                          handleFollowRequestAction(notif.id, notif.reference_id, 'approve');
                         }}
                         disabled={processingNotificationIdsRef.current.has(notif.id)}
                         className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-brand-gradient text-white text-[10px] font-bold rounded-lg hover:opacity-95 active:scale-95 transition-all shadow-glow-sm disabled:opacity-60 disabled:cursor-not-allowed"
@@ -292,7 +286,7 @@ const NotificationPage: React.FC = () => {
                       <button
                         onClick={e => {
                           e.stopPropagation();
-                          handleFollowRequestAction(notif.id, notif.actor_id, 'decline');
+                          handleFollowRequestAction(notif.id, notif.reference_id, 'decline');
                         }}
                         disabled={processingNotificationIdsRef.current.has(notif.id)}
                         className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-surface-800 hover:bg-surface-700 border border-surface-700 text-neutral-400 hover:text-neutral-200 text-[10px] font-bold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"

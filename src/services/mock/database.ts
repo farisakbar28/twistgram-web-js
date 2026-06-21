@@ -403,11 +403,12 @@ const createInitialMockDb = (): MockDatabase => {
       },
       {
         id: 'notif-004',
-        recipient_id: 'user-001',
-        actor_id: 'user-005',
+        recipient_id: 'user-002',
+        actor_id: 'user-001',
         type: 'follow_request',
+        reference_id: 'follow-001',
         is_read: false,
-        created_at: new Date(Date.now() - 3600 * 1000).toISOString(),
+        created_at: '2026-06-01T00:00:00Z',
       },
     ],
   };
@@ -502,4 +503,3 @@ export const getMockUserByEmail = (email: string) =>
 
 export const getMockUserByUsername = (username: string) =>
   mockDb.users.find(user => user.username === username);
-

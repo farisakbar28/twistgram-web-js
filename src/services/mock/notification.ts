@@ -6,9 +6,10 @@
 import { delay } from '../../utils';
 import type { User, Notification, NotificationType } from '../../types/index';
 import { getMockUserById, mockDb, persistMockDb } from './database';
-import { mockBlocks } from './social';
 
 const getNotificationsDb = (): Notification[] => mockDb.notifications;
+const getBlocksDb = () => mockDb.blocks;
+const getFollowsDb = () => mockDb.follows;
 
 const getUserObject = (userId: string): User => {
   try {
@@ -45,14 +46,88 @@ const getUserObject = (userId: string): User => {
 };
 
 const isBlocked = (userA: string, userB: string): boolean =>
-  mockBlocks.some(
+  getBlocksDb().some(
     (block) =>
       (block.blocker_id === userA && block.blocked_id === userB) ||
       (block.blocker_id === userB && block.blocked_id === userA)
   );
 
+const isValidFollowRequestNotification = (
+  notification: Notification,
+  pendingFollow: (typeof mockDb.follows)[number]
+) =>
+  notification.recipient_id === pendingFollow.following_id &&
+  notification.actor_id === pendingFollow.follower_id;
+
+export const syncFollowRequestNotifications = (): void => {
+  const notifications = getNotificationsDb();
+  const pendingFollows = getFollowsDb().filter((follow) => follow.status === 'pending');
+  const pendingById = new Map(pendingFollows.map((follow) => [follow.id, follow]));
+  const matchedFollowIds = new Set<string>();
+
+  const normalized: Notification[] = [];
+
+  for (const notification of notifications) {
+    if (notification.type !== 'follow_request') {
+      normalized.push(notification);
+      continue;
+    }
+
+    const referencedFollow = notification.reference_id
+      ? pendingById.get(notification.reference_id)
+      : pendingFollows.find((follow) => isValidFollowRequestNotification(notification, follow));
+
+    if (!referencedFollow) {
+      continue;
+    }
+
+    matchedFollowIds.add(referencedFollow.id);
+    normalized.push({
+      ...notification,
+      reference_id: referencedFollow.id,
+      recipient_id: referencedFollow.following_id,
+      actor_id: referencedFollow.follower_id,
+      created_at: notification.created_at || referencedFollow.created_at,
+    });
+  }
+
+  for (const follow of pendingFollows) {
+    if (matchedFollowIds.has(follow.id)) continue;
+
+    normalized.push({
+      id: `notif-follow-request-${follow.id}`,
+      recipient_id: follow.following_id,
+      actor_id: follow.follower_id,
+      type: 'follow_request',
+      reference_id: follow.id,
+      is_read: false,
+      created_at: follow.created_at,
+    });
+  }
+
+  const hasChanged =
+    normalized.length !== notifications.length ||
+    normalized.some((notification, index) => {
+      const previous = notifications[index];
+      return (
+        !previous ||
+        previous.id !== notification.id ||
+        previous.reference_id !== notification.reference_id ||
+        previous.recipient_id !== notification.recipient_id ||
+        previous.actor_id !== notification.actor_id ||
+        previous.is_read !== notification.is_read
+      );
+    });
+
+  if (hasChanged) {
+    notifications.splice(0, notifications.length, ...normalized);
+    persistMockDb();
+  }
+};
+
 export const getNotifications = async (currentUserId: string): Promise<Notification[]> => {
   await delay(400);
+  syncFollowRequestNotifications();
 
   return getNotificationsDb()
     .filter(
@@ -106,6 +181,9 @@ export const createNotification = async (
 ): Promise<Notification | null> => {
   if (recipientId === actorId) return null;
   if (isBlocked(recipientId, actorId)) return null;
+  if (type === 'follow_request' && !referenceId) {
+    throw new Error('Follow request notification membutuhkan reference_id request.');
+  }
 
   const deduped = getNotificationsDb().filter(
     (notification) =>
@@ -131,6 +209,10 @@ export const createNotification = async (
   deduped.push(newNotification);
   getNotificationsDb().splice(0, getNotificationsDb().length, ...deduped);
   persistMockDb();
+
+  if (type === 'follow_request') {
+    syncFollowRequestNotifications();
+  }
 
   return newNotification;
 };
