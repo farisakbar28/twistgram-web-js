@@ -1,5 +1,6 @@
 import apiClient from '../apiClient';
 import type { Post, Comment } from '../../types/index';
+import { startConversation, sendMessage } from './chat';
 
 export const getFeed = async (currentUserId: string): Promise<Post[]> => {
   void currentUserId;
@@ -9,7 +10,12 @@ export const getFeed = async (currentUserId: string): Promise<Post[]> => {
 
 export const createPost = async (
   currentUserId: string,
-  payload: { mediaUrl: string; mediaType: 'image' | 'video'; caption?: string }
+  payload: {
+    mediaUrl: string;
+    mediaType: 'image' | 'video';
+    caption?: string;
+    taggedUsernames?: string[];
+  }
 ): Promise<Post> => {
   void currentUserId;
   const res = await apiClient.post('/posts', payload);
@@ -114,6 +120,28 @@ export const sharePost = async (postId: string, currentUserId: string): Promise<
   void currentUserId;
   const res = await apiClient.post(`/posts/${postId}/share`, {});
   return res.data.link;
+};
+
+export const sharePostToDm = async (
+  postId: string,
+  currentUserId: string,
+  targetUserId: string
+): Promise<void> => {
+  // TODO(backend): ganti ke endpoint share-to-dm atomik saat backend chat/post sudah tersedia.
+  const conversation = await startConversation(currentUserId, targetUserId);
+  await sendMessage(conversation.id, currentUserId, {
+    content: `${window.location.origin}/posts/${postId}`,
+  });
+};
+
+export const removePostTag = async (
+  postId: string,
+  taggedUserId: string,
+  currentUserId: string
+): Promise<Post> => {
+  void currentUserId;
+  const res = await apiClient.delete(`/posts/${postId}/tags/${taggedUserId}`);
+  return res.data;
 };
 
 

@@ -10,6 +10,7 @@ import type {
   OtpVerifyResponse,
   RecoverUsernamePayload,
   RecoverEmailPayload,
+  CompleteRecoverEmailPayload,
 } from '../../types/auth';
 
 /** POST /auth/login — SRS §11.1 */
@@ -53,6 +54,13 @@ export const authRecoverUsername = async (payload: RecoverUsernamePayload): Prom
 /** POST /auth/recover-email — SRS §11.1 */
 export const authRecoverEmail = async (payload: RecoverEmailPayload): Promise<void> => {
   await apiClient.post('/auth/recover-email', payload);
+};
+
+export const authCompleteRecoverEmail = async (
+  payload: CompleteRecoverEmailPayload
+): Promise<void> => {
+  // TODO(backend): ganti ke endpoint recover-email confirmation saat backend auth sudah tersedia.
+  await apiClient.post('/auth/recover-email/complete', payload);
 };
 
 /** GET /users/me — bukan untuk username/email avail; namun mock punya fungsi cek availability */

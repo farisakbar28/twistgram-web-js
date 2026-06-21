@@ -54,6 +54,7 @@ const getUserObject = (userId: string): User => {
     phone: user.phone ?? undefined,
     bio: user.bio ?? undefined,
     avatar_url: user.avatar_url ?? undefined,
+    external_link: user.external_link ?? undefined,
   };
 };
 

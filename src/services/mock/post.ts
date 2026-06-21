@@ -5,9 +5,9 @@
  */
 
 import { delay } from '../../utils';
-import type { User, Post, PostMedia, Comment, SavedPost } from '../../types/index';
+import type { User, Post, PostMedia, Comment, SavedPost, PostTag } from '../../types/index';
 import { getFollowing, getInterests } from './social';
-import { getMockUserById, mockDb, persistMockDb } from './database';
+import { getMockUserById, getMockUserByUsername, mockDb, persistMockDb } from './database';
 
 interface MockLike {
   id: string;
@@ -21,13 +21,19 @@ const normalizeUser = (userId: string): User => {
   try {
     const raw = localStorage.getItem('twistgram_user');
     if (raw) {
-      const currentUser = JSON.parse(raw) as User & { phone?: string | null; bio?: string | null; avatar_url?: string | null };
+      const currentUser = JSON.parse(raw) as User & {
+        phone?: string | null;
+        bio?: string | null;
+        avatar_url?: string | null;
+        external_link?: string | null;
+      };
       if (currentUser.id === userId) {
         return {
           ...currentUser,
           phone: currentUser.phone ?? undefined,
           bio: currentUser.bio ?? undefined,
           avatar_url: currentUser.avatar_url ?? undefined,
+          external_link: currentUser.external_link ?? undefined,
         };
       }
     }
@@ -55,11 +61,13 @@ const normalizeUser = (userId: string): User => {
     phone: user.phone ?? undefined,
     bio: user.bio ?? undefined,
     avatar_url: user.avatar_url ?? undefined,
+    external_link: user.external_link ?? undefined,
   };
 };
 
 const getPostsDb = (): Post[] => mockDb.posts;
 const getMediaDb = (): PostMedia[] => mockDb.postMedia;
+const getPostTagsDb = (): PostTag[] => mockDb.postTags;
 const getCommentsDb = (): Comment[] => mockDb.comments;
 const getLikesDb = (): MockLike[] => mockDb.likes as MockLike[];
 const getSavedDb = (): SavedPost[] => mockDb.savedPosts;
@@ -69,11 +77,18 @@ const enrichPost = (post: Post, currentUserId: string): Post => {
   const likes = getLikesDb().filter((entry) => entry.post_id === post.id);
   const comments = getCommentsDb().filter((entry) => entry.post_id === post.id && !entry.deleted_at);
   const saves = getSavedDb().filter((entry) => entry.post_id === post.id);
+  const tags = getPostTagsDb()
+    .filter((entry) => entry.post_id === post.id)
+    .map((entry) => ({
+      ...entry,
+      user: normalizeUser(entry.tagged_user_id),
+    }));
 
   return {
     ...post,
     user: normalizeUser(post.user_id),
     media,
+    tags,
     likes_count: likes.length,
     comments_count: comments.length,
     is_liked: likes.some((entry) => entry.user_id === currentUserId),
@@ -138,7 +153,12 @@ export const getFeed = async (currentUserId: string): Promise<Post[]> => {
 
 export const createPost = async (
   currentUserId: string,
-  payload: { mediaUrl: string; mediaType: 'image' | 'video'; caption?: string }
+  payload: {
+    mediaUrl: string;
+    mediaType: 'image' | 'video';
+    caption?: string;
+    taggedUsernames?: string[];
+  }
 ): Promise<Post> => {
   await delay(600);
 
@@ -160,8 +180,30 @@ export const createPost = async (
 
   getPostsDb().unshift(newPost);
   getMediaDb().push(newMedia);
+  const taggedUsers = Array.from(new Set(payload.taggedUsernames ?? []))
+    .map((username) => getMockUserByUsername(username))
+    .filter((user): user is NonNullable<typeof user> => Boolean(user))
+    .filter((user) => user.id !== currentUserId);
+
+  taggedUsers.forEach((user, index) => {
+    getPostTagsDb().push({
+      id: `post-tag-${newPostId}-${index + 1}`,
+      post_id: newPostId,
+      tagged_user_id: user.id,
+      created_at: newPost.created_at,
+    });
+  });
   mockDb.postCounts[currentUserId] = (mockDb.postCounts[currentUserId] ?? 0) + 1;
   persistMockDb();
+
+  for (const user of taggedUsers) {
+    try {
+      const { createNotification } = await import('./notification');
+      await createNotification(user.id, currentUserId, 'mention', newPostId);
+    } catch {
+      // ignore mock notification failure
+    }
+  }
 
   return enrichPost(newPost, currentUserId);
 };
@@ -504,4 +546,42 @@ export const sharePost = async (postId: string, _currentUserId: string): Promise
   await delay(300);
   console.info('[Mock Share Post]', postId);
   return `${window.location.origin}/posts/${postId}`;
+};
+
+export const sharePostToDm = async (
+  postId: string,
+  currentUserId: string,
+  targetUserId: string
+): Promise<void> => {
+  await delay(250);
+  const { startConversation, sendMessage } = await import('./chat');
+  const conversation = await startConversation(currentUserId, targetUserId);
+  await sendMessage(conversation.id, currentUserId, {
+    content: `${window.location.origin}/posts/${postId}`,
+  });
+};
+
+export const removePostTag = async (
+  postId: string,
+  taggedUserId: string,
+  currentUserId: string
+): Promise<Post> => {
+  await delay(300);
+
+  const post = getPostsDb().find((entry) => entry.id === postId && !entry.deleted_at);
+  if (!post) throw new Error('Postingan tidak ditemukan.');
+  if (currentUserId !== taggedUserId && post.user_id !== currentUserId) {
+    throw new Error('Anda tidak memiliki wewenang untuk menghapus tag ini.');
+  }
+
+  const tags = getPostTagsDb();
+  const index = tags.findIndex(
+    (entry) => entry.post_id === postId && entry.tagged_user_id === taggedUserId
+  );
+  if (index === -1) throw new Error('Tag pengguna tidak ditemukan.');
+
+  tags.splice(index, 1);
+  persistMockDb();
+
+  return enrichPost(post, currentUserId);
 };

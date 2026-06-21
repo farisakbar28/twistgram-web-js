@@ -4,8 +4,9 @@ import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal } from 'lucide-r
 import type { Post } from '../../types/index';
 import Avatar from './Avatar';
 import { formatCount, formatRelativeTime } from '../../utils';
-import { likePost, unlikePost, savePost, unsavePost, sharePost } from '../../services';
+import { likePost, unlikePost, savePost, unsavePost } from '../../services';
 import { useToast } from './Toast';
+import SharePostModal from './SharePostModal';
 
 interface PostCardProps {
   post: Post;
@@ -21,6 +22,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUserId, onPostUpdate }
   const [likesCount, setLikesCount] = useState(post.likes_count ?? 0);
   const [isSaved, setIsSaved] = useState(post.is_saved ?? false);
   const [showHeartOverlay, setShowHeartOverlay] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const lastTap = useRef<number | null>(null);
 
   const mediaItem = post.media?.[0];
@@ -93,13 +95,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUserId, onPostUpdate }
 
   // Handle Share
   const handleShare = async () => {
-    try {
-      const shareUrl = await sharePost(post.id, currentUserId);
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success('Tautan disalin ke papan klip!');
-    } catch {
-      toast.error('Gagal membagikan postingan.');
-    }
+    setShowShareModal(true);
   };
 
   // Render text caption with hashtag styling
@@ -264,6 +260,13 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUserId, onPostUpdate }
           {formatRelativeTime(post.created_at)}
         </p>
       </div>
+
+      <SharePostModal
+        isOpen={showShareModal}
+        postId={post.id}
+        currentUserId={currentUserId}
+        onClose={() => setShowShareModal(false)}
+      />
     </article>
   );
 };

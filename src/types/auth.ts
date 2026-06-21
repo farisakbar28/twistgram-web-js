@@ -20,6 +20,7 @@ export interface User {
   email_verified: boolean;
   bio?: string | null;
   avatar_url?: string | null;
+  external_link?: string | null;
   is_private: boolean;
   created_at: string;
   updated_at: string;
@@ -82,6 +83,11 @@ export interface RecoverEmailPayload {
   phone: string;
 }
 
+export interface CompleteRecoverEmailPayload {
+  recoveryToken: string;
+  newEmail: string;
+}
+
 // ============================================================
 // Response Shapes
 // ============================================================
@@ -111,6 +117,8 @@ export interface OtpVerifyResponse {
   username?: string;
   /** Hanya ada bila purpose === 'recover_email' — email tersamarkan (a***@gmail.com) */
   maskedEmail?: string;
+  /** Hanya ada bila purpose === 'recover_email' — token sementara untuk set email baru */
+  recoveryToken?: string;
 }
 
 // ============================================================

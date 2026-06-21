@@ -18,6 +18,7 @@ const normalizeUser = (userId: string): User => {
           phone: currentUser.phone ?? undefined,
           bio: currentUser.bio ?? undefined,
           avatar_url: currentUser.avatar_url ?? undefined,
+          external_link: currentUser.external_link ?? undefined,
         };
       }
     }
@@ -45,6 +46,7 @@ const normalizeUser = (userId: string): User => {
     phone: user.phone ?? undefined,
     bio: user.bio ?? undefined,
     avatar_url: user.avatar_url ?? undefined,
+    external_link: user.external_link ?? undefined,
   };
 };
 

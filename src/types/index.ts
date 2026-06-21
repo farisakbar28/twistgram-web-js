@@ -68,6 +68,7 @@ export interface User {
   email_verified: boolean;
   bio?: string;
   avatar_url?: string;
+  external_link?: string;
   is_private: boolean;
   created_at: ISODateString;
   updated_at: ISODateString;
@@ -101,6 +102,7 @@ export interface Post {
   // Relations (populated by API)
   user?: User;
   media?: PostMedia[];
+  tags?: PostTag[];
   likes_count?: number;
   comments_count?: number;
   is_liked?: boolean;
@@ -112,6 +114,14 @@ export interface PostMedia {
   post_id: UUID;
   media_url: string;
   media_type: MediaType;
+}
+
+export interface PostTag {
+  id: UUID;
+  post_id: UUID;
+  tagged_user_id: UUID;
+  created_at: ISODateString;
+  user?: User;
 }
 
 export interface Comment {

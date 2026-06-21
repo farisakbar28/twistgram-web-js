@@ -7,6 +7,7 @@ import type {
   UpdatePrivacyPayload,
   ReportPayload,
 } from '../../types/social';
+import type { User } from '../../types/auth';
 
 export const getMyProfile = async (currentUserId: string): Promise<UserProfile> => {
   void currentUserId;
@@ -25,7 +26,7 @@ export const getProfileByUsername = async (
 export const updateProfile = async (
   currentUserId: string,
   payload: UpdateProfilePayload
-): Promise<any> => {
+): Promise<User> => {
   void currentUserId;
   const res = await apiClient.patch('/users/me', payload);
   return res.data;

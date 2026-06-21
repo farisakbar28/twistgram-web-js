@@ -43,6 +43,7 @@ const normalizeUser = (user: typeof mockDb.users[number]): User => ({
   phone: user.phone ?? undefined,
   bio: user.bio ?? undefined,
   avatar_url: user.avatar_url ?? undefined,
+  external_link: user.external_link ?? undefined,
 });
 
 const getFollowEntry = (followerId: string, followingId: string): MockFollow | undefined =>
@@ -127,6 +128,7 @@ export const updateProfile = async (
     ...(payload.username !== undefined && { username: payload.username }),
     ...(payload.bio !== undefined && { bio: payload.bio }),
     ...(payload.avatar_url !== undefined && { avatar_url: payload.avatar_url }),
+    ...(payload.external_link !== undefined && { external_link: payload.external_link }),
     updated_at: new Date().toISOString(),
   };
 

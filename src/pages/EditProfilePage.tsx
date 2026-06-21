@@ -75,6 +75,7 @@ const EditProfilePage: React.FC = () => {
         setUsername(data.username);
         setBio(data.bio ?? '');
         setAvatarUrl(data.avatar_url ?? '');
+        setExternalLink(data.external_link ?? '');
         setIsPrivate(data.is_private);
         const interests = await getInterests(currentUser.id);
         setSelectedInterests(interests);

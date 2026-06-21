@@ -49,6 +49,7 @@ export const authForgotPassword = auth.authForgotPassword;
 export const authResetPassword = auth.authResetPassword;
 export const authRecoverUsername = auth.authRecoverUsername;
 export const authRecoverEmail = auth.authRecoverEmail;
+export const authCompleteRecoverEmail = auth.authCompleteRecoverEmail;
 export const checkUsernameAvailable = auth.checkUsernameAvailable;
 export const checkEmailAvailable = auth.checkEmailAvailable;
 export const getLoginLockState = useMock
@@ -93,6 +94,8 @@ export const savePost = post.savePost;
 export const unsavePost = post.unsavePost;
 export const getUserSavedPosts = post.getUserSavedPosts;
 export const sharePost = post.sharePost;
+export const sharePostToDm = post.sharePostToDm;
+export const removePostTag = post.removePostTag;
 
 export const getStoryFeed = story.getStoryFeed;
 export const getStoryById = story.getStoryById;

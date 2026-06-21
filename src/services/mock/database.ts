@@ -5,6 +5,7 @@ import type {
   Message,
   Notification,
   Post,
+  PostTag,
   PostMedia,
   SavedPost,
   Story,
@@ -29,6 +30,7 @@ export interface MockDatabase {
   blocks: Block[];
   posts: Post[];
   postMedia: PostMedia[];
+  postTags: PostTag[];
   comments: Comment[];
   likes: MockLikeRecord[];
   savedPosts: SavedPost[];
@@ -44,6 +46,7 @@ const STORAGE_KEY_DB = 'twistgram_mock_db';
 const LEGACY_STORAGE_KEYS = {
   posts: 'twistgram_posts',
   postMedia: 'twistgram_post_media',
+  postTags: 'twistgram_post_tags',
   comments: 'twistgram_comments',
   likes: 'twistgram_likes',
   savedPosts: 'twistgram_saved_posts',
@@ -245,6 +248,7 @@ const createInitialMockDb = (): MockDatabase => {
         media_type: 'image',
       },
     ],
+    postTags: [],
     comments: [
       {
         id: 'comment-001',
@@ -427,6 +431,7 @@ const syncLegacyStorage = (db: MockDatabase) => {
   try {
     localStorage.setItem(LEGACY_STORAGE_KEYS.posts, JSON.stringify(db.posts));
     localStorage.setItem(LEGACY_STORAGE_KEYS.postMedia, JSON.stringify(db.postMedia));
+    localStorage.setItem(LEGACY_STORAGE_KEYS.postTags, JSON.stringify(db.postTags));
     localStorage.setItem(LEGACY_STORAGE_KEYS.comments, JSON.stringify(db.comments));
     localStorage.setItem(LEGACY_STORAGE_KEYS.likes, JSON.stringify(db.likes));
     localStorage.setItem(LEGACY_STORAGE_KEYS.savedPosts, JSON.stringify(db.savedPosts));
@@ -460,6 +465,7 @@ const hydrateFromLegacySlices = (db: MockDatabase): MockDatabase => {
     ...db,
     posts: readStorage<Post[]>(LEGACY_STORAGE_KEYS.posts) ?? db.posts,
     postMedia: readStorage<PostMedia[]>(LEGACY_STORAGE_KEYS.postMedia) ?? db.postMedia,
+    postTags: readStorage<PostTag[]>(LEGACY_STORAGE_KEYS.postTags) ?? db.postTags,
     comments: readStorage<Comment[]>(LEGACY_STORAGE_KEYS.comments) ?? db.comments,
     likes: readStorage<MockLikeRecord[]>(LEGACY_STORAGE_KEYS.likes) ?? db.likes,
     savedPosts: readStorage<SavedPost[]>(LEGACY_STORAGE_KEYS.savedPosts) ?? db.savedPosts,

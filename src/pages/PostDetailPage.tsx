@@ -7,12 +7,12 @@ import {
   unlikePost,
   savePost,
   unsavePost,
-  sharePost,
   deletePost,
   archivePost,
   unarchivePost,
   updatePostCaption,
   reportContent,
+  removePostTag,
 } from '../services';
 import type { Post } from '../types/index';
 import type { ReportReason } from '../types/social';
@@ -24,6 +24,7 @@ import EmptyState from '../components/common/EmptyState';
 import CommentSection from '../components/common/CommentSection';
 import Modal from '../components/common/Modal';
 import ReportContentModal, { buildReportPayload } from '../components/common/ReportContentModal';
+import SharePostModal from '../components/common/SharePostModal';
 import { useToast } from '../components/common/Toast';
 import { formatCount, formatRelativeTime } from '../utils';
 import {
@@ -56,6 +57,7 @@ const PostDetailPage: React.FC = () => {
   // Modals & edits
   const [showOptions, setShowOptions] = useState(false);
   const [showEditCaption, setShowEditCaption] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [editCaptionText, setEditCaptionText] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
   const [selectedReportReason, setSelectedReportReason] = useState<ReportReason>('spam');
@@ -126,14 +128,7 @@ const PostDetailPage: React.FC = () => {
   };
 
   const handleShare = async () => {
-    if (!post) return;
-    try {
-      const url = await sharePost(post.id, currentUser.id);
-      await navigator.clipboard.writeText(url);
-      toast.success('Tautan berhasil disalin ke papan klip!');
-    } catch {
-      toast.error('Gagal membagikan postingan.');
-    }
+    setShowShareModal(true);
   };
 
   const handleDeletePost = async () => {
@@ -195,6 +190,20 @@ const PostDetailPage: React.FC = () => {
       toast.success('Laporan postingan berhasil dikirim.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal mengirim laporan postingan.');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRemoveTag = async (taggedUserId: string) => {
+    if (!post) return;
+    setIsActionLoading(true);
+    try {
+      const updated = await removePostTag(post.id, taggedUserId, currentUser.id);
+      setPost(updated);
+      toast.success('Tag pengguna berhasil dihapus.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal menghapus tag pengguna.');
     } finally {
       setIsActionLoading(false);
     }
@@ -308,6 +317,37 @@ const PostDetailPage: React.FC = () => {
                 </Link>
                 {post.caption}
               </p>
+            )}
+            {post.tags && post.tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {post.tags.map((tag) => {
+                  const canRemoveTag =
+                    currentUser.id === tag.tagged_user_id || currentUser.id === post.user_id;
+
+                  return (
+                    <div
+                      key={tag.id}
+                      className="flex items-center gap-2 rounded-full border border-brand-500/20 bg-brand-500/10 px-3 py-1"
+                    >
+                      <Link
+                        to={`/profile/${tag.user?.username}`}
+                        className="text-[11px] font-semibold text-brand-300 hover:underline"
+                      >
+                        @{tag.user?.username}
+                      </Link>
+                      {canRemoveTag && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tag.tagged_user_id)}
+                          className="text-[10px] text-neutral-400 hover:text-neutral-200"
+                        >
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
             <span className="text-[10px] text-neutral-500 block mt-2 uppercase tracking-wider select-none">
               {formatRelativeTime(post.created_at)}
@@ -465,6 +505,13 @@ const PostDetailPage: React.FC = () => {
         isSubmitting={isActionLoading}
         onReasonChange={setSelectedReportReason}
         onSubmit={handleReportPost}
+      />
+
+      <SharePostModal
+        isOpen={showShareModal}
+        postId={post.id}
+        currentUserId={currentUser.id}
+        onClose={() => setShowShareModal(false)}
       />
     </div>
   );

@@ -21,7 +21,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { UserSearch, MailWarning, User, Mail, Phone, ArrowLeft, AlertCircle, HelpCircle } from 'lucide-react';
-import { authRecoverUsername, authRecoverEmail } from '../services';
+import { authRecoverUsername, authRecoverEmail, authCompleteRecoverEmail } from '../services';
 import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 
@@ -33,9 +33,11 @@ const RecoverAccountPage: React.FC = () => {
 
   // Ambil state hasil verifikasi OTP
   const state = location.state as {
-    step?: 'result_username' | 'result_email';
+    step?: 'result_username' | 'result_email' | 'set_new_email';
     username?: string;
     maskedEmail?: string;
+    recoveryToken?: string;
+    recoveredEmail?: string;
   } | null;
 
   const currentStep = state?.step ?? 'select';
@@ -45,6 +47,8 @@ const RecoverAccountPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [phone, setPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [confirmNewEmail, setConfirmNewEmail] = useState('');
 
   // UI states
   const [isLoading, setIsLoading] = useState(false);
@@ -106,6 +110,42 @@ const RecoverAccountPage: React.FC = () => {
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memproses permintaan.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCompleteRecoverEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = newEmail.trim().toLowerCase();
+    if (!state?.recoveryToken || !cleanEmail) return;
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setError('Format email baru tidak valid.');
+      return;
+    }
+    if (cleanEmail !== confirmNewEmail.trim().toLowerCase()) {
+      setError('Konfirmasi email baru tidak cocok.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    try {
+      await authCompleteRecoverEmail({
+        recoveryToken: state.recoveryToken,
+        newEmail: cleanEmail,
+      });
+      navigate('/recover-account', {
+        replace: true,
+        state: {
+          step: 'result_email',
+          recoveredEmail: cleanEmail,
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memperbarui email.');
     } finally {
       setIsLoading(false);
     }
@@ -281,13 +321,13 @@ const RecoverAccountPage: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-neutral-100">Email Ditemukan!</h2>
           <p className="text-sm text-neutral-400 mt-1">
-            Alamat email Anda yang tersamar telah diverifikasi.
+            Email login akun Anda sudah diperbarui.
           </p>
         </div>
       </div>
 
       <div className="bg-surface-950 border border-surface-800 rounded-xl p-4 font-mono text-base font-semibold text-neutral-200">
-        {state?.maskedEmail}
+        {state?.recoveredEmail ?? state?.maskedEmail}
       </div>
 
       <div className="text-xs text-neutral-400 leading-relaxed text-left bg-surface-950/40 p-3 rounded-xl border border-surface-800/80">
@@ -304,6 +344,60 @@ const RecoverAccountPage: React.FC = () => {
         Kembali ke Login
       </Button>
     </div>
+  );
+
+  const renderSetNewEmail = () => (
+    <form onSubmit={handleCompleteRecoverEmail} className="flex flex-col gap-4" noValidate>
+      <div className="text-xs text-neutral-400 leading-relaxed bg-surface-950/40 p-3 rounded-xl border border-surface-800/80">
+        Email lama terverifikasi: <span className="font-semibold text-neutral-200">{state?.maskedEmail}</span>
+        <br />
+        Masukkan email login baru untuk akun Anda.
+      </div>
+      {error && (
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-danger-500/10 border border-danger-500/20 text-danger-400 text-sm animate-fade-in">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
+      <Input
+        id="recover-new-email"
+        label="Email Baru"
+        type="email"
+        placeholder="nama@emailbaru.com"
+        value={newEmail}
+        onChange={(e) => {
+          setNewEmail(e.target.value);
+          setError('');
+        }}
+        leftIcon={<Mail className="h-4 w-4" />}
+        disabled={isLoading}
+        required
+      />
+      <Input
+        id="recover-confirm-email"
+        label="Konfirmasi Email Baru"
+        type="email"
+        placeholder="Ulangi email baru"
+        value={confirmNewEmail}
+        onChange={(e) => {
+          setConfirmNewEmail(e.target.value);
+          setError('');
+        }}
+        leftIcon={<Mail className="h-4 w-4" />}
+        disabled={isLoading}
+        required
+      />
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        fullWidth
+        loading={isLoading}
+        disabled={!newEmail.trim() || !confirmNewEmail.trim() || isLoading}
+      >
+        Simpan Email Baru
+      </Button>
+    </form>
   );
 
   // ============================================================
@@ -345,6 +439,7 @@ const RecoverAccountPage: React.FC = () => {
           {currentStep === 'select' && renderForm()}
           {currentStep === 'result_username' && renderUsernameResult()}
           {currentStep === 'result_email' && renderEmailResult()}
+          {currentStep === 'set_new_email' && renderSetNewEmail()}
         </div>
       </div>
     </div>

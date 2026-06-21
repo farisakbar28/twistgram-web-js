@@ -16,6 +16,7 @@ const CreatePostPage: React.FC = () => {
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
   const [caption, setCaption] = useState('');
+  const [taggedUsersInput, setTaggedUsersInput] = useState('');
 
   // UI States
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,6 +48,10 @@ const CreatePostPage: React.FC = () => {
         mediaUrl: mediaUrl.trim(),
         mediaType,
         caption: caption.trim() || undefined,
+        taggedUsernames: taggedUsersInput
+          .split(',')
+          .map((value) => value.trim().replace(/^@/, ''))
+          .filter(Boolean),
       });
       toast.success('Postingan berhasil dibagikan!');
       navigate(`/profile/${currentUser.username}`);
@@ -174,6 +179,15 @@ const CreatePostPage: React.FC = () => {
             </span>
           </div>
         </div>
+
+        <Input
+          id="create-tagged-users"
+          label="Tag Pengguna"
+          placeholder="@claraclarissa, @andiwirawan"
+          value={taggedUsersInput}
+          onChange={e => setTaggedUsersInput(e.target.value)}
+          helperText="Pisahkan beberapa username dengan koma. Pengguna yang valid akan menerima notifikasi mention."
+        />
 
         {/* Notice text */}
         <p className="text-[10px] text-neutral-500 text-left select-none -mt-2">

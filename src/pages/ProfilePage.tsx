@@ -27,6 +27,7 @@ import {
   Heart,
   MessageCircle,
   Ban,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../features/auth/AuthContext';
 import {
@@ -328,6 +329,17 @@ const ProfilePage: React.FC = () => {
             <p className="text-sm text-neutral-300 leading-relaxed mt-1 whitespace-pre-wrap">
               {profile.bio}
             </p>
+          )}
+          {profile.external_link && (
+            <a
+              href={profile.external_link}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-brand-300 hover:text-brand-200 hover:underline"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {profile.external_link}
+            </a>
           )}
 
           {/* Interests */}

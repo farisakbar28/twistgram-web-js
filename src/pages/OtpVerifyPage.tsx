@@ -168,9 +168,13 @@ const OtpVerifyPage: React.FC = () => {
         });
 
       } else if (purpose === 'recover_email') {
-        toast.success('Email ditemukan!');
+        toast.success('Verifikasi berhasil. Atur email baru Anda.');
         navigate('/recover-account', {
-          state: { step: 'result_email', maskedEmail: result.maskedEmail },
+          state: {
+            step: 'set_new_email',
+            maskedEmail: result.maskedEmail,
+            recoveryToken: result.recoveryToken,
+          },
           replace: true,
         });
       }

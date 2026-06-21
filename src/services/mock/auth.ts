@@ -22,6 +22,7 @@ import type {
   OtpVerifyResponse,
   RecoverUsernamePayload,
   RecoverEmailPayload,
+  CompleteRecoverEmailPayload,
 } from '../../types/auth';
 import {
   getMockUserByEmail,
@@ -235,7 +236,11 @@ export const authVerifyOtp = async (payload: VerifyOtpPayload): Promise<OtpVerif
     const user = getMockUserByUsername(identifier);
     if (user) {
       const [local, domain] = user.email.split('@');
-      return { success: true, maskedEmail: `${local[0]}***@${domain}` };
+      return {
+        success: true,
+        maskedEmail: `${local[0]}***@${domain}`,
+        recoveryToken: `recover_email_${user.id}_${Date.now()}`,
+      };
     }
   }
 
@@ -277,6 +282,45 @@ export const authRecoverEmail = async (payload: RecoverEmailPayload): Promise<vo
   if (user && user.phone_verified) {
     saveOtp('recover_email', payload.username);
   }
+};
+
+export const authCompleteRecoverEmail = async (
+  payload: CompleteRecoverEmailPayload
+): Promise<void> => {
+  await delay(600);
+
+  if (!payload.recoveryToken.startsWith('recover_email_')) {
+    throw new Error('Token pemulihan email tidak valid.');
+  }
+
+  const newEmail = payload.newEmail.trim().toLowerCase();
+  const userId = payload.recoveryToken.split('_')[2];
+  const user = mockDb.users.find((candidate) => candidate.id === userId);
+
+  if (!user) {
+    throw new Error('Akun pemulihan tidak ditemukan.');
+  }
+
+  const existing = getMockUserByEmail(newEmail);
+  if (existing && existing.id !== user.id) {
+    throw new Error('Email baru sudah digunakan oleh akun lain.');
+  }
+
+  user.email = newEmail;
+  user.email_verified = true;
+  user.updated_at = new Date().toISOString();
+  persistMockDb();
+
+  updateStoredUser((currentUser) =>
+    currentUser.id === user.id
+      ? {
+          ...currentUser,
+          email: newEmail,
+          email_verified: true,
+          updated_at: user.updated_at,
+        }
+      : currentUser
+  );
 };
 
 export const checkUsernameAvailable = async (username: string): Promise<boolean> => {
