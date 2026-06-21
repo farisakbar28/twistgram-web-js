@@ -275,6 +275,15 @@ export const getFollowRequests = async (currentUserId: string): Promise<FollowRe
     .filter(Boolean) as FollowRequest[];
 };
 
+export const getBlockedUsers = async (currentUserId: string): Promise<UserProfile[]> => {
+  await delay(400);
+  return mockBlocks
+    .filter((block) => block.blocker_id === currentUserId)
+    .map((block) => getMockUserById(block.blocked_id))
+    .filter(Boolean)
+    .map((user) => buildUserProfile(user!, currentUserId));
+};
+
 export const approveFollowRequest = async (requestId: string): Promise<void> => {
   await delay(400);
   const follow = mockFollows.find((entry) => entry.id === requestId);

@@ -26,6 +26,7 @@ import {
   Bookmark,
   Heart,
   MessageCircle,
+  Ban,
 } from 'lucide-react';
 import { useAuth } from '../features/auth/AuthContext';
 import {
@@ -33,7 +34,10 @@ import {
   followUser,
   unfollowUser,
   blockUser,
+  unblockUser,
+  getBlockedUsers,
   reportContent,
+  startConversation,
 } from '../services';
 import {
   getUserPosts,
@@ -48,6 +52,7 @@ import FollowButton from '../components/common/FollowButton';
 import Spinner from '../components/common/Spinner';
 import Modal from '../components/common/Modal';
 import EmptyState from '../components/common/EmptyState';
+import ReportContentModal, { buildReportPayload } from '../components/common/ReportContentModal';
 import { useToast } from '../components/common/Toast';
 import { formatCount } from '../utils';
 
@@ -67,18 +72,6 @@ const StatItem: React.FC<{ label: string; value: number; to?: string }> = ({ lab
   if (to) return <Link to={to}>{content}</Link>;
   return content;
 };
-
-const REPORT_REASONS: { value: ReportReason; label: string }[] = [
-  { value: 'spam', label: 'Spam' },
-  { value: 'inappropriate', label: 'Konten tidak pantas' },
-  { value: 'harassment', label: 'Pelecehan / Intimidasi' },
-  { value: 'fake_account', label: 'Akun palsu' },
-  { value: 'other', label: 'Lainnya' },
-];
-
-// ============================================================
-// Component
-// ============================================================
 
 const ProfilePage: React.FC = () => {
   const { username } = useParams<{ username: string }>();
@@ -100,8 +93,11 @@ const ProfilePage: React.FC = () => {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showBlockedUsersModal, setShowBlockedUsersModal] = useState(false);
   const [selectedReason, setSelectedReason] = useState<ReportReason>('spam');
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<UserProfile[]>([]);
+  const [isBlockedUsersLoading, setIsBlockedUsersLoading] = useState(false);
 
   // Load profile
   const loadProfile = useCallback(async () => {
@@ -186,15 +182,58 @@ const ProfilePage: React.FC = () => {
     if (!currentUser || !profile) return;
     setIsActionLoading(true);
     try {
-      await reportContent(currentUser.id, {
-        target_type: 'user',
-        target_id: profile.id,
-        reason: selectedReason,
-      });
+      await reportContent(currentUser.id, buildReportPayload('user', profile.id, selectedReason));
       toast.success('Laporan berhasil dikirim. Tim moderasi akan meninjau.');
       setShowReportModal(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal mengirim laporan.');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleMessage = async () => {
+    if (!currentUser || !profile) return;
+    setIsActionLoading(true);
+    try {
+      const conversation = await startConversation(currentUser.id, profile.id);
+      navigate('/chat', { state: { conversationId: conversation.id } });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal memulai percakapan.');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const loadBlockedUsers = useCallback(async () => {
+    if (!currentUser) return;
+    setIsBlockedUsersLoading(true);
+    try {
+      const data = await getBlockedUsers(currentUser.id);
+      setBlockedUsers(data);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal memuat daftar blokir.');
+    } finally {
+      setIsBlockedUsersLoading(false);
+    }
+  }, [currentUser, toast]);
+
+  const openBlockedUsers = async () => {
+    setShowBlockedUsersModal(true);
+    await loadBlockedUsers();
+  };
+
+  const handleUnblock = async (targetUserId: string, targetUsername: string) => {
+    if (!currentUser) return;
+    setIsActionLoading(true);
+    try {
+      await unblockUser(currentUser.id, targetUserId);
+      setBlockedUsers((currentBlockedUsers) =>
+        currentBlockedUsers.filter((user) => user.id !== targetUserId)
+      );
+      toast.success(`@${targetUsername} berhasil dibuka blokirnya.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal membuka blokir.');
     } finally {
       setIsActionLoading(false);
     }
@@ -332,6 +371,15 @@ const ProfilePage: React.FC = () => {
                 </Button>
               )}
               <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Ban className="h-3.5 w-3.5" />}
+                onClick={openBlockedUsers}
+                className="shrink-0"
+              >
+                Diblokir
+              </Button>
+              <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate('/showcase')}
@@ -354,7 +402,13 @@ const ProfilePage: React.FC = () => {
                 />
               </div>
               {profile.follow_status === 'following' && (
-                <Button variant="secondary" size="sm" className="shrink-0">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={handleMessage}
+                  loading={isActionLoading}
+                >
                   Pesan
                 </Button>
               )}
@@ -622,58 +676,62 @@ const ProfilePage: React.FC = () => {
       </Modal>
 
       {/* ── Report Modal ── */}
-      <Modal
+      <ReportContentModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
         title="Laporkan Pengguna"
+        targetLabel="pengguna ini"
+        selectedReason={selectedReason}
+        isSubmitting={isActionLoading}
+        onReasonChange={setSelectedReason}
+        onSubmit={handleReport}
+      />
+
+      <Modal
+        isOpen={showBlockedUsersModal}
+        onClose={() => setShowBlockedUsersModal(false)}
+        title="Akun Diblokir"
         size="sm"
       >
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-neutral-400">Pilih alasan laporan:</p>
-          <div className="flex flex-col gap-1">
-            {REPORT_REASONS.map(r => (
-              <button
-                key={r.value}
-                onClick={() => setSelectedReason(r.value)}
-                className={[
-                  'flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm transition-colors text-left',
-                  selectedReason === r.value
-                    ? 'bg-brand-500/10 border border-brand-500/30 text-brand-300'
-                    : 'text-neutral-300 hover:bg-surface-800',
-                ].join(' ')}
+        <div className="flex flex-col gap-3">
+          {isBlockedUsersLoading ? (
+            <div className="flex justify-center py-8">
+              <Spinner size="md" className="text-brand-500" />
+            </div>
+          ) : blockedUsers.length === 0 ? (
+            <EmptyState
+              icon={<Ban className="h-8 w-8" />}
+              title="Belum ada akun diblokir"
+              description="Akun yang Anda blokir akan muncul di sini."
+            />
+          ) : (
+            blockedUsers.map((blockedUser) => (
+              <div
+                key={blockedUser.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-surface-800 bg-surface-900/70 px-3 py-3"
               >
-                <span className={[
-                  'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0',
-                  selectedReason === r.value ? 'border-brand-500' : 'border-surface-600',
-                ].join(' ')}>
-                  {selectedReason === r.value && (
-                    <span className="w-2 h-2 rounded-full bg-brand-500" />
-                  )}
-                </span>
-                {r.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2 pt-2 border-t border-surface-800">
-            <Button
-              variant="ghost"
-              size="md"
-              fullWidth
-              onClick={() => setShowReportModal(false)}
-              disabled={isActionLoading}
-            >
-              Batal
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              fullWidth
-              loading={isActionLoading}
-              onClick={handleReport}
-            >
-              Kirim Laporan
-            </Button>
-          </div>
+                <Link to={`/profile/${blockedUser.username}`} className="flex items-center gap-3 min-w-0">
+                  <Avatar
+                    src={blockedUser.avatar_url}
+                    name={blockedUser.name}
+                    size="sm"
+                  />
+                  <div className="min-w-0 text-left">
+                    <p className="text-sm font-semibold text-neutral-100 truncate">{blockedUser.name}</p>
+                    <p className="text-xs text-neutral-400 truncate">@{blockedUser.username}</p>
+                  </div>
+                </Link>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  onClick={() => handleUnblock(blockedUser.id, blockedUser.username)}
+                  disabled={isActionLoading}
+                >
+                  Unblock
+                </Button>
+              </div>
+            ))
+          )}
         </div>
       </Modal>
     </div>

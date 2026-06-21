@@ -12,8 +12,10 @@ import {
   archivePost,
   unarchivePost,
   updatePostCaption,
+  reportContent,
 } from '../services';
 import type { Post } from '../types/index';
+import type { ReportReason } from '../types/social';
 import Avatar from '../components/common/Avatar';
 import Button from '../components/common/Button';
 import IconButton from '../components/common/IconButton';
@@ -21,6 +23,7 @@ import Spinner from '../components/common/Spinner';
 import EmptyState from '../components/common/EmptyState';
 import CommentSection from '../components/common/CommentSection';
 import Modal from '../components/common/Modal';
+import ReportContentModal, { buildReportPayload } from '../components/common/ReportContentModal';
 import { useToast } from '../components/common/Toast';
 import { formatCount, formatRelativeTime } from '../utils';
 import {
@@ -32,6 +35,7 @@ import {
   Archive,
   Edit2,
   MoreVertical,
+  Flag,
 } from 'lucide-react';
 
 const PostDetailPage: React.FC = () => {
@@ -53,6 +57,8 @@ const PostDetailPage: React.FC = () => {
   const [showOptions, setShowOptions] = useState(false);
   const [showEditCaption, setShowEditCaption] = useState(false);
   const [editCaptionText, setEditCaptionText] = useState('');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [selectedReportReason, setSelectedReportReason] = useState<ReportReason>('spam');
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   // Load post details
@@ -180,6 +186,20 @@ const PostDetailPage: React.FC = () => {
     }
   };
 
+  const handleReportPost = async () => {
+    if (!post) return;
+    setIsActionLoading(true);
+    try {
+      await reportContent(currentUser.id, buildReportPayload('post', post.id, selectedReportReason));
+      setShowReportModal(false);
+      toast.success('Laporan postingan berhasil dikirim.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim laporan postingan.');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -219,16 +239,14 @@ const PostDetailPage: React.FC = () => {
           </button>
           <span className="text-sm font-bold text-neutral-100">Postingan</span>
         </div>
-        {isOwnPost && (
-          <IconButton
-            variant="ghost"
-            size="sm"
-            icon={<MoreVertical className="h-5 w-5" />}
-            label="Opsi postingan"
-            onClick={() => setShowOptions(true)}
-            className="text-neutral-400 hover:text-neutral-100"
-          />
-        )}
+        <IconButton
+          variant="ghost"
+          size="sm"
+          icon={<MoreVertical className="h-5 w-5" />}
+          label="Opsi postingan"
+          onClick={() => setShowOptions(true)}
+          className="text-neutral-400 hover:text-neutral-100"
+        />
       </div>
 
       {/* Main Grid View */}
@@ -343,7 +361,7 @@ const PostDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Owner Options Modal */}
+      {/* Post Options Modal */}
       <Modal
         isOpen={showOptions}
         onClose={() => setShowOptions(false)}
@@ -351,34 +369,51 @@ const PostDetailPage: React.FC = () => {
         size="sm"
       >
         <div className="flex flex-col gap-1 -mx-2">
-          <button
-            onClick={() => { setShowOptions(false); setShowEditCaption(true); }}
-            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-neutral-200 hover:bg-surface-800 rounded-xl transition-colors text-left"
-            disabled={isActionLoading}
-          >
-            <Edit2 className="h-4 w-4 text-neutral-400" />
-            Ubah Caption
-          </button>
-          
-          <button
-            onClick={handleArchiveToggle}
-            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-neutral-200 hover:bg-surface-800 rounded-xl transition-colors text-left"
-            disabled={isActionLoading}
-          >
-            <Archive className="h-4 w-4 text-neutral-400" />
-            {post.is_archived ? 'Kembalikan dari Arsip' : 'Arsipkan Postingan'}
-          </button>
+          {isOwnPost ? (
+            <>
+              <button
+                onClick={() => { setShowOptions(false); setShowEditCaption(true); }}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-neutral-200 hover:bg-surface-800 rounded-xl transition-colors text-left"
+                disabled={isActionLoading}
+              >
+                <Edit2 className="h-4 w-4 text-neutral-400" />
+                Ubah Caption
+              </button>
 
-          <div className="border-t border-surface-800 my-1" />
+              <button
+                onClick={handleArchiveToggle}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-neutral-200 hover:bg-surface-800 rounded-xl transition-colors text-left"
+                disabled={isActionLoading}
+              >
+                <Archive className="h-4 w-4 text-neutral-400" />
+                {post.is_archived ? 'Kembalikan dari Arsip' : 'Arsipkan Postingan'}
+              </button>
 
-          <button
-            onClick={handleDeletePost}
-            className="flex items-center gap-3 w-full px-4 py-3 text-sm text-danger-400 hover:bg-surface-800 rounded-xl transition-colors text-left"
-            disabled={isActionLoading}
-          >
-            <Trash2 className="h-4 w-4 text-danger-500" />
-            Hapus Postingan
-          </button>
+              <div className="border-t border-surface-800 my-1" />
+
+              <button
+                onClick={handleDeletePost}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-danger-400 hover:bg-surface-800 rounded-xl transition-colors text-left"
+                disabled={isActionLoading}
+              >
+                <Trash2 className="h-4 w-4 text-danger-500" />
+                Hapus Postingan
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => {
+                setSelectedReportReason('spam');
+                setShowOptions(false);
+                setShowReportModal(true);
+              }}
+              className="flex items-center gap-3 w-full px-4 py-3 text-sm text-warning-400 hover:bg-surface-800 rounded-xl transition-colors text-left"
+              disabled={isActionLoading}
+            >
+              <Flag className="h-4 w-4" />
+              Laporkan postingan ini
+            </button>
+          )}
         </div>
       </Modal>
 
@@ -420,6 +455,17 @@ const PostDetailPage: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      <ReportContentModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        title="Laporkan Postingan"
+        targetLabel="postingan ini"
+        selectedReason={selectedReportReason}
+        isSubmitting={isActionLoading}
+        onReasonChange={setSelectedReportReason}
+        onSubmit={handleReportPost}
+      />
     </div>
   );
 };

@@ -99,6 +99,12 @@ export const getFollowRequests = async (currentUserId: string): Promise<FollowRe
   return res.data;
 };
 
+export const getBlockedUsers = async (currentUserId: string): Promise<UserProfile[]> => {
+  void currentUserId;
+  const res = await apiClient.get('/users/me/blocked');
+  return res.data;
+};
+
 export const approveFollowRequest = async (requestId: string): Promise<void> => {
   await apiClient.post(`/follow-requests/${requestId}/approve`, {});
 };

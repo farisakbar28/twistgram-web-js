@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Send, CornerDownRight, Trash2 } from 'lucide-react';
+import { Send, CornerDownRight, Trash2, Heart, Flag } from 'lucide-react';
 import type { Comment } from '../../types/index';
+import type { ReportReason } from '../../types/social';
 import Avatar from './Avatar';
 import Spinner from './Spinner';
 import { formatRelativeTime } from '../../utils';
-import { getPostComments, createComment, deleteComment } from '../../services';
+import {
+  getPostComments,
+  createComment,
+  deleteComment,
+  likeComment,
+  unlikeComment,
+  reportContent,
+} from '../../services';
 import { useToast } from './Toast';
+import ReportContentModal, { buildReportPayload } from './ReportContentModal';
 
 interface CommentSectionProps {
   postId: string;
@@ -27,6 +36,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   const [text, setText] = useState('');
   const [replyTarget, setReplyTarget] = useState<{ id: string; username: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeReportComment, setActiveReportComment] = useState<Comment | null>(null);
+  const [selectedReportReason, setSelectedReportReason] = useState<ReportReason>('spam');
+  const [isReportSubmitting, setIsReportSubmitting] = useState(false);
 
   // Load comments
   const load = useCallback(async () => {
@@ -83,16 +95,77 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 
   const startReply = (commentId: string, username: string) => {
     setReplyTarget({ id: commentId, username });
-    // Focus input
     const input = document.getElementById('comment-input');
     if (input) input.focus();
   };
 
-  // Render individual comment item
+  const handleCommentLikeToggle = async (comment: Comment) => {
+    const nextLiked = !(comment.is_liked ?? false);
+
+    setComments((currentComments) =>
+      currentComments.map((entry) => {
+        if (entry.id === comment.id) {
+          return {
+            ...entry,
+            is_liked: nextLiked,
+            likes_count: nextLiked
+              ? (entry.likes_count ?? 0) + 1
+              : Math.max(0, (entry.likes_count ?? 0) - 1),
+          };
+        }
+
+        if (!entry.replies) return entry;
+
+        return {
+          ...entry,
+          replies: entry.replies.map((reply) =>
+            reply.id === comment.id
+              ? {
+                  ...reply,
+                  is_liked: nextLiked,
+                  likes_count: nextLiked
+                    ? (reply.likes_count ?? 0) + 1
+                    : Math.max(0, (reply.likes_count ?? 0) - 1),
+                }
+              : reply
+          ),
+        };
+      })
+    );
+
+    try {
+      if (nextLiked) {
+        await likeComment(comment.id, currentUserId);
+      } else {
+        await unlikeComment(comment.id, currentUserId);
+      }
+    } catch {
+      await load();
+      toast.error('Gagal memperbarui like komentar.');
+    }
+  };
+
+  const handleReportComment = async () => {
+    if (!activeReportComment) return;
+
+    setIsReportSubmitting(true);
+    try {
+      await reportContent(currentUserId, buildReportPayload('comment', activeReportComment.id, selectedReportReason));
+      toast.success('Laporan komentar berhasil dikirim.');
+      setActiveReportComment(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengirim laporan komentar.');
+    } finally {
+      setIsReportSubmitting(false);
+    }
+  };
+
   const renderCommentItem = (item: Comment, isReply = false) => {
     const isAuthor = item.user_id === currentUserId;
     const isPostOwner = postOwnerId === currentUserId;
     const canDelete = isAuthor || isPostOwner;
+    const likesCount = item.likes_count ?? 0;
+    const isLiked = item.is_liked ?? false;
 
     return (
       <div key={item.id} className={`flex gap-3 text-left ${isReply ? 'mt-3 pl-8' : 'mt-4 border-b border-surface-800/40 pb-4'}`}>
@@ -128,8 +201,18 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 
           {/* Footer Actions */}
           <div className="flex items-center gap-3 mt-1.5 select-none">
+            <button
+              type="button"
+              onClick={() => handleCommentLikeToggle(item)}
+              className={`text-[10px] font-semibold transition-colors flex items-center gap-1 ${isLiked ? 'text-rose-400 hover:text-rose-300' : 'text-neutral-400 hover:text-neutral-200'}`}
+            >
+              <Heart className={`h-3 w-3 ${isLiked ? 'fill-rose-400' : ''}`} />
+              {likesCount > 0 ? likesCount : 'Suka'}
+            </button>
+
             {!isReply && (
               <button
+                type="button"
                 onClick={() => startReply(item.id, item.user?.username ?? '')}
                 className="text-[10px] font-semibold text-neutral-400 hover:text-neutral-200 transition-colors"
               >
@@ -137,8 +220,23 @@ const CommentSection: React.FC<CommentSectionProps> = ({
               </button>
             )}
 
+            {!isAuthor && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedReportReason('spam');
+                  setActiveReportComment(item);
+                }}
+                className="text-[10px] font-semibold text-warning-400 hover:text-warning-300 transition-colors flex items-center gap-0.5"
+              >
+                <Flag className="h-3 w-3" />
+                Laporkan
+              </button>
+            )}
+
             {canDelete && (
               <button
+                type="button"
                 onClick={() => handleDelete(item.id)}
                 className="text-[10px] font-semibold text-danger-400 hover:text-danger-300 transition-colors flex items-center gap-0.5"
               >
@@ -222,6 +320,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({
           </button>
         </div>
       </form>
+
+      <ReportContentModal
+        isOpen={activeReportComment !== null}
+        onClose={() => setActiveReportComment(null)}
+        title="Laporkan Komentar"
+        targetLabel="komentar ini"
+        selectedReason={selectedReportReason}
+        isSubmitting={isReportSubmitting}
+        onReasonChange={setSelectedReportReason}
+        onSubmit={handleReportComment}
+      />
     </div>
   );
 };

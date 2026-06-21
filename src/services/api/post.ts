@@ -84,6 +84,16 @@ export const deleteComment = async (commentId: string, currentUserId: string): P
   await apiClient.delete(`/comments/${commentId}`);
 };
 
+export const likeComment = async (commentId: string, currentUserId: string): Promise<void> => {
+  void currentUserId;
+  await apiClient.post(`/comments/${commentId}/like`, {});
+};
+
+export const unlikeComment = async (commentId: string, currentUserId: string): Promise<void> => {
+  void currentUserId;
+  await apiClient.delete(`/comments/${commentId}/like`);
+};
+
 export const savePost = async (postId: string, currentUserId: string): Promise<void> => {
   void currentUserId;
   await apiClient.post(`/posts/${postId}/save`, {});

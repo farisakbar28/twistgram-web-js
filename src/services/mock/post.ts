@@ -327,7 +327,7 @@ export const unlikePost = async (postId: string, currentUserId: string): Promise
 
 export const getPostComments = async (
   postId: string,
-  _currentUserId: string
+  currentUserId: string
 ): Promise<Comment[]> => {
   await delay(400);
 
@@ -338,6 +338,10 @@ export const getPostComments = async (
   const enrichComment = (comment: Comment): Comment => ({
     ...comment,
     user: normalizeUser(comment.user_id),
+    likes_count: getLikesDb().filter((like) => like.comment_id === comment.id).length,
+    is_liked: getLikesDb().some(
+      (like) => like.comment_id === comment.id && like.user_id === currentUserId
+    ),
   });
 
   const rootComments = postComments
@@ -412,6 +416,39 @@ export const deleteComment = async (commentId: string, currentUserId: string): P
   }
 
   comments[index].deleted_at = new Date().toISOString();
+  persistMockDb();
+};
+
+export const likeComment = async (commentId: string, currentUserId: string): Promise<void> => {
+  await delay(300);
+
+  const comment = getCommentsDb().find((entry) => entry.id === commentId && !entry.deleted_at);
+  if (!comment) throw new Error('Komentar tidak ditemukan.');
+
+  const likes = getLikesDb();
+  const alreadyLiked = likes.some(
+    (like) => like.user_id === currentUserId && like.comment_id === commentId
+  );
+
+  if (alreadyLiked) return;
+
+  likes.push({
+    id: `like-${Date.now()}`,
+    user_id: currentUserId,
+    comment_id: commentId,
+    created_at: new Date().toISOString(),
+  });
+  persistMockDb();
+};
+
+export const unlikeComment = async (commentId: string, currentUserId: string): Promise<void> => {
+  await delay(300);
+
+  const likes = getLikesDb();
+  const filtered = likes.filter(
+    (like) => !(like.user_id === currentUserId && like.comment_id === commentId)
+  );
+  likes.splice(0, likes.length, ...filtered);
   persistMockDb();
 };
 
