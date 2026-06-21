@@ -7,7 +7,15 @@ import type { Message, Story } from '../types/index';
 import Avatar from '../components/common/Avatar';
 import Spinner from '../components/common/Spinner';
 import { useToast } from '../components/common/Toast';
-import { Send, Image as ImageIcon, ArrowLeft, SendHorizontal, MessageCircle, Link2, Eye } from 'lucide-react';
+import {
+  Send,
+  Image as ImageIcon,
+  ArrowLeft,
+  SendHorizontal,
+  MessageCircle,
+  Link2,
+  Eye,
+} from 'lucide-react';
 import { formatRelativeTime } from '../utils';
 
 // ============================================================
@@ -36,6 +44,8 @@ const ChatPage: React.FC = () => {
   // Conversations states
   const [conversations, setConversations] = useState<ConversationWithMeta[]>([]);
   const [activeConv, setActiveConv] = useState<ConversationWithMeta | null>(null);
+  const activeConvRef = useRef<ConversationWithMeta | null>(null);
+
   const [activeTab, setActiveTab] = useState<'main' | 'requests'>('main');
   const [isConvsLoading, setIsConvsLoading] = useState(true);
 
@@ -50,31 +60,58 @@ const ChatPage: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const pollIntervalRef = useRef<any>(null);
 
+  // Track last message id for the active conversation to avoid unnecessary refetches/spinners
+  const lastActiveLastMessageIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync to avoid stale reads without re-creating polling callbacks
+  useEffect(() => {
+    activeConvRef.current = activeConv;
+  }, [activeConv]);
+
   // Scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const fetchConvs = useCallback(async (silent = false) => {
-    if (!currentUser) return;
-    if (!silent) setIsConvsLoading(true);
-    try {
-      const data = await getConversations(currentUser.id);
-      setConversations(data);
-      
-      // Update active conversation in state if it's open to reflect new messages
-      if (activeConv) {
-        const updated = data.find(c => c.id === activeConv.id);
-        if (updated) {
-          setActiveConv(updated);
+  const fetchConvs = useCallback(
+    async (silent = false) => {
+      if (!currentUser) return;
+      if (!silent) setIsConvsLoading(true);
+
+      try {
+        const data = await getConversations(currentUser.id);
+
+        // Update sidebar conversations immediately
+        setConversations(data);
+
+        // If active conversation exists, detect last_message changes and refetch messages (silent) to update chat panel
+        const active = activeConvRef.current;
+        if (active) {
+          const updatedActive = data.find(c => c.id === active.id);
+          const updatedLastId = updatedActive?.last_message?.id ?? null;
+
+          if (updatedLastId && lastActiveLastMessageIdRef.current !== updatedLastId) {
+            lastActiveLastMessageIdRef.current = updatedLastId;
+            const msgs = await getMessages(active.id, currentUser.id);
+            setMessages(msgs);
+            setTimeout(scrollToBottom, 50);
+          }
         }
+
+        // Finally sync activeConv object for any other UI needs
+        setActiveConv(prev => {
+          if (!prev) return prev;
+          const updated = data.find(c => c.id === prev.id);
+          return updated ?? prev;
+        });
+      } catch (err) {
+        console.error('Failed to load conversations:', err);
+      } finally {
+        if (!silent) setIsConvsLoading(false);
       }
-    } catch (err) {
-      console.error('Failed to load conversations:', err);
-    } finally {
-      if (!silent) setIsConvsLoading(false);
-    }
-  }, [currentUser, activeConv]);
+    },
+    [currentUser]
+  );
 
   // Polling for incoming messages
   useEffect(() => {
@@ -97,6 +134,10 @@ const ChatPage: React.FC = () => {
       try {
         const data = await getMessages(activeConv.id, currentUser.id);
         setMessages(data);
+
+        // Initialize last message id tracking for silent polling updates
+        lastActiveLastMessageIdRef.current = activeConv.last_message?.id ?? null;
+
         setTimeout(scrollToBottom, 50);
       } catch (err) {
         console.error('Failed to load messages:', err);
@@ -105,7 +146,7 @@ const ChatPage: React.FC = () => {
       }
     };
     fetchMessagesList();
-  }, [activeConv, currentUser]);
+  }, [activeConv?.id, currentUser]);
 
   // Watch for new messages to auto scroll
   useEffect(() => {
@@ -147,13 +188,13 @@ const ChatPage: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto w-full h-[calc(100vh-80px)] md:h-[80vh] flex bg-surface-900 border border-surface-800/80 rounded-2xl overflow-hidden shadow-2xl animate-fade-in text-left">
-      
       {/* 1. Sidebar - Threads List */}
-      <div className={[
-        'w-full md:w-80 border-r border-surface-800 flex flex-col shrink-0',
-        activeConv ? 'hidden md:flex' : 'flex'
-      ].join(' ')}>
-        
+      <div
+        className={[
+          'w-full md:w-80 border-r border-surface-800 flex flex-col shrink-0',
+          activeConv ? 'hidden md:flex' : 'flex',
+        ].join(' ')}
+      >
         {/* Sidebar Header */}
         <div className="p-4 border-b border-surface-800 flex items-center justify-between">
           <h1 className="text-base font-extrabold text-neutral-100 select-none">Pesan Langsung</h1>
@@ -173,7 +214,7 @@ const ChatPage: React.FC = () => {
               'flex-1 py-3 border-b-2 transition-all flex items-center justify-center gap-1.5',
               activeTab === 'main'
                 ? 'border-brand-500 text-brand-400 font-bold'
-                : 'border-transparent text-neutral-500 hover:text-neutral-400'
+                : 'border-transparent text-neutral-500 hover:text-neutral-400',
             ].join(' ')}
           >
             Utama
@@ -187,7 +228,7 @@ const ChatPage: React.FC = () => {
               'flex-1 py-3 border-b-2 transition-all flex items-center justify-center gap-1.5',
               activeTab === 'requests'
                 ? 'border-brand-500 text-brand-400 font-bold'
-                : 'border-transparent text-neutral-500 hover:text-neutral-400'
+                : 'border-transparent text-neutral-500 hover:text-neutral-400',
             ].join(' ')}
           >
             Permintaan
@@ -232,7 +273,7 @@ const ChatPage: React.FC = () => {
                     'w-full flex items-center justify-between p-3 rounded-xl transition-all text-left group',
                     isActive
                       ? 'bg-brand-500/10 border border-brand-500/20 text-neutral-50 shadow-glow-sm'
-                      : 'hover:bg-surface-800 text-neutral-400 hover:text-neutral-200 border border-transparent'
+                      : 'hover:bg-surface-800 text-neutral-400 hover:text-neutral-200 border border-transparent',
                   ].join(' ')}
                 >
                   <div className="flex items-center gap-3 overflow-hidden">
@@ -241,11 +282,16 @@ const ChatPage: React.FC = () => {
                       <span className="text-xs font-bold text-neutral-100 group-hover:text-brand-400 transition-colors truncate">
                         {partner.name}
                       </span>
-                      <span className={[
-                        'text-[10px] truncate mt-0.5 max-w-[140px]',
-                        conv.unread_count > 0 ? 'text-neutral-50 font-semibold' : 'text-neutral-500'
-                      ].join(' ')}>
-                        {conv.last_message?.content || (conv.last_message?.media_url ? '📷 Foto' : 'Mulai obrolan...')}
+                      <span
+                        className={[
+                          'text-[10px] truncate mt-0.5 max-w-[140px]',
+                          conv.unread_count > 0
+                            ? 'text-neutral-50 font-semibold'
+                            : 'text-neutral-500',
+                        ].join(' ')}
+                      >
+                        {conv.last_message?.content ||
+                          (conv.last_message?.media_url ? '📷 Foto' : 'Mulai obrolan...')}
                       </span>
                     </div>
                   </div>
@@ -268,11 +314,12 @@ const ChatPage: React.FC = () => {
       </div>
 
       {/* 2. Active Chat Window */}
-      <div className={[
-        'flex-1 flex flex-col bg-surface-950/20',
-        activeConv ? 'flex' : 'hidden md:flex'
-      ].join(' ')}>
-        
+      <div
+        className={[
+          'flex-1 flex flex-col bg-surface-950/20',
+          activeConv ? 'flex' : 'hidden md:flex',
+        ].join(' ')}
+      >
         {activeConv && activePartner ? (
           <>
             {/* Chat Header */}
@@ -292,9 +339,7 @@ const ChatPage: React.FC = () => {
                   <span className="text-xs font-bold text-neutral-100 leading-tight">
                     {activePartner.name}
                   </span>
-                  <span className="text-[9px] text-neutral-400">
-                    @{activePartner.username}
-                  </span>
+                  <span className="text-[9px] text-neutral-400">@{activePartner.username}</span>
                 </div>
               </div>
             </div>
@@ -307,26 +352,30 @@ const ChatPage: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  {messages.map((msg) => {
+                  {messages.map(msg => {
                     const isSelf = msg.sender_id === currentUser.id;
-                    const storyReplied = msg.reply_to_story_id ? getStoryFromDb(msg.reply_to_story_id) : null;
+                    const storyReplied = msg.reply_to_story_id
+                      ? getStoryFromDb(msg.reply_to_story_id)
+                      : null;
 
                     return (
                       <div
                         key={msg.id}
                         className={[
                           'flex flex-col max-w-[75%]',
-                          isSelf ? 'self-end items-end' : 'self-start items-start'
+                          isSelf ? 'self-end items-end' : 'self-start items-start',
                         ].join(' ')}
                       >
                         {/* Render story reply preview card */}
                         {msg.reply_to_story_id && (
-                          <div className={[
-                            'mb-1.5 p-2 rounded-xl border flex items-center gap-2.5 text-[10px] w-full max-w-[200px] select-none text-left',
-                            isSelf
-                              ? 'bg-brand-500/10 border-brand-500/25 text-brand-300'
-                              : 'bg-surface-800 border-surface-700 text-neutral-400'
-                          ].join(' ')}>
+                          <div
+                            className={[
+                              'mb-1.5 p-2 rounded-xl border flex items-center gap-2.5 text-[10px] w-full max-w-[200px] select-none text-left',
+                              isSelf
+                                ? 'bg-brand-500/10 border-brand-500/25 text-brand-300'
+                                : 'bg-surface-800 border-surface-700 text-neutral-400',
+                            ].join(' ')}
+                          >
                             <div className="w-8 h-12 bg-neutral-900 rounded-lg overflow-hidden shrink-0 flex items-center justify-center text-[7px] font-bold text-white relative">
                               {storyReplied ? (
                                 storyReplied.media_type === 'text' ? (
@@ -334,7 +383,11 @@ const ChatPage: React.FC = () => {
                                     {storyReplied.text_content}
                                   </div>
                                 ) : (
-                                  <img src={storyReplied.media_url} className="w-full h-full object-cover" alt="" />
+                                  <img
+                                    src={storyReplied.media_url}
+                                    className="w-full h-full object-cover"
+                                    alt=""
+                                  />
                                 )
                               ) : (
                                 <div className="text-neutral-600 flex flex-col items-center">
@@ -344,7 +397,9 @@ const ChatPage: React.FC = () => {
                               )}
                             </div>
                             <div className="flex flex-col overflow-hidden leading-snug">
-                              <span className="font-semibold text-neutral-200">Membalas cerita</span>
+                              <span className="font-semibold text-neutral-200">
+                                Membalas cerita
+                              </span>
                               <span className="truncate text-neutral-400 mt-0.5">
                                 {storyReplied?.text_content || 'Cerita tidak tersedia'}
                               </span>
@@ -358,18 +413,22 @@ const ChatPage: React.FC = () => {
                             'px-4 py-2.5 rounded-2xl text-xs leading-normal shadow-sm border text-left break-words',
                             isSelf
                               ? 'bg-brand-gradient border-brand-500/30 text-white rounded-tr-none'
-                              : 'bg-surface-800 border-surface-700 text-neutral-100 rounded-tl-none'
+                              : 'bg-surface-800 border-surface-700 text-neutral-100 rounded-tl-none',
                           ].join(' ')}
                         >
                           {/* Image inside chat */}
                           {msg.media_url && (
                             <div className="mb-1.5 max-w-[220px] rounded-lg overflow-hidden border border-black/10 select-none">
-                              <img src={msg.media_url} alt="Attached" className="max-h-[160px] w-full object-cover" />
+                              <img
+                                src={msg.media_url}
+                                alt="Attached"
+                                className="max-h-[160px] w-full object-cover"
+                              />
                             </div>
                           )}
                           <p>{msg.content}</p>
                         </div>
-                        
+
                         <span className="text-[7.5px] text-neutral-500 mt-1 select-none">
                           {formatRelativeTime(msg.created_at)}
                         </span>
@@ -392,7 +451,7 @@ const ChatPage: React.FC = () => {
                       type="text"
                       placeholder="Masukkan URL foto (misal: https://example.com/image.jpg)..."
                       value={imageUrlInput}
-                      onChange={(e) => setImageUrlInput(e.target.value)}
+                      onChange={e => setImageUrlInput(e.target.value)}
                       className="flex-1 bg-transparent text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none"
                     />
                     <button
@@ -417,7 +476,7 @@ const ChatPage: React.FC = () => {
                       'h-11 w-11 flex items-center justify-center rounded-xl border transition-all duration-200 shrink-0',
                       showImageAttach
                         ? 'bg-brand-500/10 border-brand-500/35 text-brand-400'
-                        : 'bg-surface-800 border-surface-700 text-neutral-400 hover:border-surface-600 hover:text-neutral-200'
+                        : 'bg-surface-800 border-surface-700 text-neutral-400 hover:border-surface-600 hover:text-neutral-200',
                     ].join(' ')}
                     title="Lampirkan Gambar"
                   >
@@ -428,7 +487,7 @@ const ChatPage: React.FC = () => {
                     type="text"
                     placeholder="Ketik pesan Anda..."
                     value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
+                    onChange={e => setInputText(e.target.value)}
                     className="flex-1 bg-surface-800 border border-surface-700 rounded-xl px-4 py-3 text-xs text-neutral-50 placeholder-neutral-500 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none transition-all"
                   />
 
@@ -451,7 +510,8 @@ const ChatPage: React.FC = () => {
             </div>
             <h2 className="text-base font-extrabold text-neutral-200">Pesan Anda</h2>
             <p className="text-xs text-neutral-500 mt-1 max-w-[280px]">
-              Kirim pesan dan foto privat kepada teman atau keluarga secara instan dan aman di Twistgram.
+              Kirim pesan dan foto privat kepada teman atau keluarga secara instan dan aman di
+              Twistgram.
             </p>
             <button
               onClick={() => {
@@ -465,7 +525,6 @@ const ChatPage: React.FC = () => {
           </div>
         )}
       </div>
-
     </div>
   );
 };

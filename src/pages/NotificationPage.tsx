@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../features/auth/AuthContext';
-import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '../services/mock/notification';
-import { getFollowRequests, approveFollowRequest, declineFollowRequest } from '../services/mock/social';
+import {
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+} from '../services/mock/notification';
+import {
+  getFollowRequests,
+  approveFollowRequest,
+  declineFollowRequest,
+} from '../services/mock/social';
 import type { Notification } from '../types/index';
 import Avatar from '../components/common/Avatar';
 import Spinner from '../components/common/Spinner';
@@ -76,27 +84,55 @@ const NotificationPage: React.FC = () => {
   };
 
   // Follow request actions directly in notification card
-  const handleFollowRequestAction = async (actorId: string, action: 'approve' | 'decline') => {
+  // Guard idempotency: mencegah handler ke-trigger 2x sehingga mock kedua membaca state yang sudah berubah.
+  const processingNotificationIdsRef = React.useRef<Set<string>>(new Set());
+
+  const handleFollowRequestAction = async (
+    notificationId: string,
+    actorId: string,
+    action: 'approve' | 'decline'
+  ) => {
+    // Idempotency guard
+    if (processingNotificationIdsRef.current.has(notificationId)) return;
+    processingNotificationIdsRef.current.add(notificationId);
+
+    // Simpan data original untuk kompensasi optimistic UI
+    const original = notifications.find(n => n.id === notificationId);
+
+    // Optimistic UI: hilangkan tombol/kartu secepat mungkin agar tidak terlihat masih pending
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+
     try {
       // Find follow request id corresponding to the actor
       const requests = await getFollowRequests(currentUser.id);
       const matched = requests.find(r => r.from_user?.id === actorId);
 
-      if (matched) {
-        if (action === 'approve') {
-          await approveFollowRequest(matched.id);
-          toast.success('Permintaan follow disetujui.');
-        } else {
-          await declineFollowRequest(matched.id);
-          toast.success('Permintaan follow ditolak.');
-        }
-      } else {
-        // Fallback if not found or already approved
-        toast.info('Permintaan follow sudah diproses sebelumnya.');
+      if (!matched) {
+        // Jika already processed oleh invocation lain, jangan tampilkan toast pada klik pertama.
+        // Karena kita sudah optimistic-hide, kondisi ini biasanya terjadi jika handler ke-trigger ganda.
+        return;
       }
-      fetchNotifs();
+
+      if (action === 'approve') {
+        await approveFollowRequest(matched.id);
+        toast.success('Permintaan follow disetujui.');
+      } else {
+        await declineFollowRequest(matched.id);
+        toast.success('Permintaan follow ditolak.');
+      }
+
+      // Tidak memanggil fetchNotifs() agar kartu follow_request tidak “balik” dari storage
     } catch (err: any) {
+      // Jika gagal, kembalikan kartu agar user bisa retry
+      if (original) {
+        setNotifications(prev => {
+          if (prev.some(n => n.id === notificationId)) return prev;
+          return [original, ...prev];
+        });
+      }
       toast.error(err.message || 'Gagal memproses permintaan follow.');
+    } finally {
+      processingNotificationIdsRef.current.delete(notificationId);
     }
   };
 
@@ -121,13 +157,11 @@ const NotificationPage: React.FC = () => {
     }
   };
 
-  const filteredNotifications = activeTab === 'all'
-    ? notifications
-    : notifications.filter(n => !n.is_read);
+  const filteredNotifications =
+    activeTab === 'all' ? notifications : notifications.filter(n => !n.is_read);
 
   return (
     <div className="max-w-xl mx-auto w-full px-4 py-6 flex flex-col gap-6 text-left">
-      
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-surface-900 pb-3 select-none">
         <div className="flex items-center gap-2.5">
@@ -156,7 +190,7 @@ const NotificationPage: React.FC = () => {
             'flex-1 py-3 border-b-2 transition-all flex items-center justify-center gap-1.5',
             activeTab === 'all'
               ? 'border-brand-500 text-brand-400 font-bold'
-              : 'border-transparent text-neutral-500 hover:text-neutral-400'
+              : 'border-transparent text-neutral-500 hover:text-neutral-400',
           ].join(' ')}
         >
           Semua
@@ -170,7 +204,7 @@ const NotificationPage: React.FC = () => {
             'flex-1 py-3 border-b-2 transition-all flex items-center justify-center gap-1.5',
             activeTab === 'unread'
               ? 'border-brand-500 text-brand-400 font-bold'
-              : 'border-transparent text-neutral-500 hover:text-neutral-400'
+              : 'border-transparent text-neutral-500 hover:text-neutral-400',
           ].join(' ')}
         >
           Belum Dibaca
@@ -200,15 +234,18 @@ const NotificationPage: React.FC = () => {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {filteredNotifications.map((notif) => {
+            {filteredNotifications.map(notif => {
               if (!notif.actor) return null;
               return (
                 <div
                   key={notif.id}
-                  onClick={() => handleNotificationClick(notif)}
+                  onClick={() => {
+                    if (notif.type === 'follow_request') return;
+                    handleNotificationClick(notif);
+                  }}
                   className={[
                     'flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-900 border border-surface-800/80 rounded-xl transition-all cursor-pointer relative gap-3 group overflow-hidden',
-                    !notif.is_read ? 'bg-brand-500/[0.02] border-brand-500/15 shadow-glow-sm' : ''
+                    !notif.is_read ? 'bg-brand-500/[0.02] border-brand-500/15 shadow-glow-sm' : '',
                   ].join(' ')}
                 >
                   {/* Unread Glow Ribbon indicator */}
@@ -219,12 +256,12 @@ const NotificationPage: React.FC = () => {
                   <div className="flex items-center gap-3 overflow-hidden">
                     <Link
                       to={`/profile/${notif.actor.username}`}
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={e => e.stopPropagation()}
                       className="shrink-0"
                     >
                       <Avatar src={notif.actor.avatar_url} name={notif.actor.name} size="md" />
                     </Link>
-                    
+
                     <div className="flex flex-col text-left">
                       <p className="text-xs text-neutral-200 leading-normal">
                         {getNotificationText(notif)}
@@ -238,19 +275,27 @@ const NotificationPage: React.FC = () => {
                   {/* Notification specific action row */}
                   {notif.type === 'follow_request' ? (
                     <div
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={e => e.stopPropagation()}
                       className="flex gap-2 shrink-0 self-end sm:self-center"
                     >
                       <button
-                        onClick={() => handleFollowRequestAction(notif.actor_id, 'approve')}
-                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-brand-gradient text-white text-[10px] font-bold rounded-lg hover:opacity-95 active:scale-95 transition-all shadow-glow-sm"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleFollowRequestAction(notif.id, notif.actor_id, 'approve');
+                        }}
+                        disabled={processingNotificationIdsRef.current.has(notif.id)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-brand-gradient text-white text-[10px] font-bold rounded-lg hover:opacity-95 active:scale-95 transition-all shadow-glow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         Setujui
                       </button>
                       <button
-                        onClick={() => handleFollowRequestAction(notif.actor_id, 'decline')}
-                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-surface-800 hover:bg-surface-700 border border-surface-700 text-neutral-400 hover:text-neutral-200 text-[10px] font-bold rounded-lg active:scale-95 transition-all"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleFollowRequestAction(notif.id, notif.actor_id, 'decline');
+                        }}
+                        disabled={processingNotificationIdsRef.current.has(notif.id)}
+                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-surface-800 hover:bg-surface-700 border border-surface-700 text-neutral-400 hover:text-neutral-200 text-[10px] font-bold rounded-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <XCircle className="h-3.5 w-3.5" />
                         Tolak
@@ -267,7 +312,6 @@ const NotificationPage: React.FC = () => {
           </div>
         )}
       </div>
-
     </div>
   );
 };

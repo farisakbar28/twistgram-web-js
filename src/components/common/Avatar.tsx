@@ -24,12 +24,37 @@ export interface AvatarProps {
 // ============================================================
 
 const sizeMap: Record<AvatarSize, { container: string; img: string; text: string; dot: string }> = {
-  xs:  { container: 'h-6 w-6',   img: 'h-6 w-6',   text: 'text-[10px]', dot: 'h-1.5 w-1.5 bottom-0 right-0' },
-  sm:  { container: 'h-8 w-8',   img: 'h-8 w-8',   text: 'text-xs',     dot: 'h-2 w-2 bottom-0 right-0' },
-  md:  { container: 'h-10 w-10', img: 'h-10 w-10', text: 'text-sm',     dot: 'h-2.5 w-2.5 bottom-0.5 right-0.5' },
-  lg:  { container: 'h-14 w-14', img: 'h-14 w-14', text: 'text-base',   dot: 'h-3 w-3 bottom-0.5 right-0.5' },
-  xl:  { container: 'h-20 w-20', img: 'h-20 w-20', text: 'text-xl',     dot: 'h-3.5 w-3.5 bottom-1 right-1' },
-  '2xl': { container: 'h-28 w-28', img: 'h-28 w-28', text: 'text-2xl', dot: 'h-4 w-4 bottom-1 right-1' },
+  xs: {
+    container: 'h-6 w-6',
+    img: 'h-6 w-6',
+    text: 'text-[10px]',
+    dot: 'h-1.5 w-1.5 bottom-0 right-0',
+  },
+  sm: { container: 'h-8 w-8', img: 'h-8 w-8', text: 'text-xs', dot: 'h-2 w-2 bottom-0 right-0' },
+  md: {
+    container: 'h-10 w-10',
+    img: 'h-10 w-10',
+    text: 'text-sm',
+    dot: 'h-2.5 w-2.5 bottom-0.5 right-0.5',
+  },
+  lg: {
+    container: 'h-14 w-14',
+    img: 'h-14 w-14',
+    text: 'text-base',
+    dot: 'h-3 w-3 bottom-0.5 right-0.5',
+  },
+  xl: {
+    container: 'h-20 w-20',
+    img: 'h-20 w-20',
+    text: 'text-xl',
+    dot: 'h-3.5 w-3.5 bottom-1 right-1',
+  },
+  '2xl': {
+    container: 'h-28 w-28',
+    img: 'h-28 w-28',
+    text: 'text-2xl',
+    dot: 'h-4 w-4 bottom-1 right-1',
+  },
 };
 
 // ============================================================
@@ -72,7 +97,7 @@ const Avatar = ({
   const hue = getHue(name);
 
   const inner = (
-    <div className={`relative inline-flex shrink-0 ${className}`}>
+    <div className={`relative inline-flex shrink-0 rounded-full overflow-hidden ${className}`}>
       {/* Story ring wrapper */}
       {hasStory ? (
         <div className="story-ring">
@@ -139,13 +164,7 @@ interface AvatarInnerProps {
 
 const AvatarInner = ({ src, alt, initials, hue, styles }: AvatarInnerProps): ReactNode => {
   if (src) {
-    return (
-      <img
-        src={src}
-        alt={alt}
-        className={`${styles.img} rounded-full object-cover`}
-      />
-    );
+    return <img src={src} alt={alt} className={`${styles.img} rounded-full object-cover`} />;
   }
 
   return (

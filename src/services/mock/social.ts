@@ -457,14 +457,51 @@ export const approveFollowRequest = async (requestId: string): Promise<void> => 
     const { createNotification } = await import('./notification');
     await createNotification(follow.follower_id, follow.following_id, 'follow');
   } catch {}
+
+  // BUG 4 fix: hapus notifikasi follow_request dari storage
+  try {
+    const raw = localStorage.getItem('twistgram_notifications');
+    if (raw) {
+      const notifs = JSON.parse(raw) as any[];
+      const filtered = notifs.filter(
+        n =>
+          !(
+            n.type === 'follow_request' &&
+            n.actor_id === follow.follower_id &&
+            n.recipient_id === follow.following_id
+          )
+      );
+      localStorage.setItem('twistgram_notifications', JSON.stringify(filtered));
+    }
+  } catch {}
 };
 
 /** POST /follow-requests/:id/decline */
 export const declineFollowRequest = async (requestId: string): Promise<void> => {
   await delay(400);
+  const follow = mockFollows.find(f => f.id === requestId && f.status === 'pending');
+  if (!follow) throw new Error('Permintaan tidak ditemukan.');
+
   const idx = mockFollows.findIndex(f => f.id === requestId && f.status === 'pending');
   if (idx === -1) throw new Error('Permintaan tidak ditemukan.');
   mockFollows.splice(idx, 1);
+
+  // BUG 4 fix: hapus notifikasi follow_request dari storage
+  try {
+    const raw = localStorage.getItem('twistgram_notifications');
+    if (raw) {
+      const notifs = JSON.parse(raw) as any[];
+      const filtered = notifs.filter(
+        n =>
+          !(
+            n.type === 'follow_request' &&
+            n.actor_id === follow.follower_id &&
+            n.recipient_id === follow.following_id
+          )
+      );
+      localStorage.setItem('twistgram_notifications', JSON.stringify(filtered));
+    }
+  } catch {}
 };
 
 // ============================================================

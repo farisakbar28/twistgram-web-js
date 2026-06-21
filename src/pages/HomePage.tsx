@@ -8,6 +8,7 @@ import PostCard from '../components/common/PostCard';
 import Spinner from '../components/common/Spinner';
 import EmptyState from '../components/common/EmptyState';
 import Avatar from '../components/common/Avatar';
+import FollowButton from '../components/common/FollowButton';
 import { Link } from 'react-router-dom';
 import { Sparkles, Users } from 'lucide-react';
 
@@ -21,7 +22,7 @@ const HomePage: React.FC = () => {
   const { currentUser } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Suggestions list
   const [suggestedUsers, setSuggestedUsers] = useState<UserProfile[]>([]);
 
@@ -71,6 +72,35 @@ const HomePage: React.FC = () => {
     }
   }, [currentUser]);
 
+  const handleSuggestionFollow = useCallback(
+    async (targetUserId: string) => {
+      if (!currentUser) return;
+      try {
+        const social = await import('../services/mock/social');
+        await social.followUser(currentUser.id, targetUserId);
+        // refresh UI agar follow_status/tombol konsisten dengan state mock server
+        await fetchSuggestions();
+      } catch {
+        // ignore (error handling handled in FollowButton if needed later)
+      }
+    },
+    [currentUser, fetchSuggestions]
+  );
+
+  const handleSuggestionUnfollow = useCallback(
+    async (targetUserId: string) => {
+      if (!currentUser) return;
+      try {
+        const social = await import('../services/mock/social');
+        await social.unfollowUser(currentUser.id, targetUserId);
+        await fetchSuggestions();
+      } catch {
+        // ignore
+      }
+    },
+    [currentUser, fetchSuggestions]
+  );
+
   useEffect(() => {
     if (currentUser) {
       fetchFeed();
@@ -108,7 +138,7 @@ const HomePage: React.FC = () => {
             title="Feed Anda Kosong"
             description="Ikuti pengguna lain atau pilih minat baru untuk melihat postingan di beranda Anda."
             actionLabel="Cari Teman"
-            onAction={() => window.location.pathname = '/search'}
+            onAction={() => (window.location.pathname = '/search')}
           />
         ) : (
           <div className="flex flex-col">
@@ -129,14 +159,17 @@ const HomePage: React.FC = () => {
         {/* User profile summary */}
         <div className="flex items-center justify-between">
           <Link to={`/profile/${currentUser.username}`} className="flex items-center gap-3 group">
-            <Avatar src={currentUser.avatar_url} name={currentUser.name} size="md" className="ring-1 ring-brand-500/10 group-hover:ring-brand-500/30 transition-all" />
+            <Avatar
+              src={currentUser.avatar_url}
+              name={currentUser.name}
+              size="md"
+              className="ring-1 ring-brand-500/10 group-hover:ring-brand-500/30 transition-all"
+            />
             <div className="flex flex-col text-left">
               <span className="text-sm font-bold text-neutral-100 group-hover:text-brand-400 transition-colors">
                 {currentUser.name}
               </span>
-              <span className="text-xs text-neutral-400">
-                @{currentUser.username}
-              </span>
+              <span className="text-xs text-neutral-400">@{currentUser.username}</span>
             </div>
           </Link>
           <span className="text-xs text-brand-400 font-semibold cursor-pointer hover:text-brand-300">
@@ -151,7 +184,10 @@ const HomePage: React.FC = () => {
               <Sparkles className="h-3.5 w-3.5 text-brand-400" />
               Saran Untuk Anda
             </span>
-            <Link to="/search" className="text-[10px] text-neutral-500 hover:text-neutral-300 font-semibold uppercase">
+            <Link
+              to="/search"
+              className="text-[10px] text-neutral-500 hover:text-neutral-300 font-semibold uppercase"
+            >
               Cari Semua
             </Link>
           </div>
@@ -163,7 +199,10 @@ const HomePage: React.FC = () => {
             <div className="flex flex-col gap-3.5">
               {suggestedUsers.map(user => (
                 <div key={user.id} className="flex items-center justify-between">
-                  <Link to={`/profile/${user.username}`} className="flex items-center gap-2.5 group">
+                  <Link
+                    to={`/profile/${user.username}`}
+                    className="flex items-center gap-2.5 group"
+                  >
                     <Avatar src={user.avatar_url} name={user.name} size="sm" />
                     <div className="flex flex-col text-left">
                       <span className="text-xs font-semibold text-neutral-100 group-hover:text-brand-400 transition-colors truncate max-w-[120px]">
@@ -174,12 +213,15 @@ const HomePage: React.FC = () => {
                       </span>
                     </div>
                   </Link>
-                  <Link
-                    to={`/profile/${user.username}`}
-                    className="text-xs text-brand-400 hover:text-brand-300 font-semibold px-2 py-1 bg-brand-500/5 hover:bg-brand-500/10 border border-brand-500/10 hover:border-brand-500/20 rounded-lg transition-all"
-                  >
-                    Detail
-                  </Link>
+
+                  {user.is_own_profile ? null : (
+                    <FollowButton
+                      followStatus={user.follow_status}
+                      size="sm"
+                      onFollow={() => handleSuggestionFollow(user.id)}
+                      onUnfollow={() => handleSuggestionUnfollow(user.id)}
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -189,7 +231,9 @@ const HomePage: React.FC = () => {
         {/* Mini footer */}
         <footer className="text-[10px] text-neutral-600 flex flex-col gap-1 text-left select-none">
           <p>© 2026 TWISTGRAM FROM GOOGLE DEEPMIND</p>
-          <p className="mt-1">Dibuat sebagai implementasi frontend media sosial berkualitas tinggi.</p>
+          <p className="mt-1">
+            Dibuat sebagai implementasi frontend media sosial berkualitas tinggi.
+          </p>
         </footer>
       </div>
 
