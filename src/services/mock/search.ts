@@ -5,202 +5,158 @@
 
 import { delay } from '../../utils';
 import type { User, Post, PostMedia } from '../../types/index';
+import { getMockUserById, mockDb } from './database';
 import { MOCK_USERS, mockBlocks, mockFollows } from './social';
 
-// ============================================================
-// Helpers
-// ============================================================
-
-const getPostsDb = (): Post[] => {
-  try {
-    const raw = localStorage.getItem('twistgram_posts');
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const getMediaDb = (): PostMedia[] => {
-  try {
-    const raw = localStorage.getItem('twistgram_post_media');
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const getLikesDb = (): any[] => {
-  try {
-    const raw = localStorage.getItem('twistgram_likes');
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const getCommentsDb = (): any[] => {
-  try {
-    const raw = localStorage.getItem('twistgram_comments');
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
-
-const getSavedDb = (): any[] => {
-  try {
-    const raw = localStorage.getItem('twistgram_saved_posts');
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
+const getPostsDb = (): Post[] => mockDb.posts;
+const getMediaDb = (): PostMedia[] => mockDb.postMedia;
+const getLikesDb = (): Array<{ user_id: string; post_id?: string }> => mockDb.likes as Array<{
+  user_id: string;
+  post_id?: string;
+}>;
+const getCommentsDb = (): Array<{ post_id: string; deleted_at?: string }> => mockDb.comments as Array<{
+  post_id: string;
+  deleted_at?: string;
+}>;
+const getSavedDb = (): Array<{ user_id: string; post_id: string }> => mockDb.savedPosts as Array<{
+  user_id: string;
+  post_id: string;
+}>;
 
 const getUserObject = (userId: string): User => {
-  // Sync with localStorage
   try {
     const raw = localStorage.getItem('twistgram_user');
     if (raw) {
-      const u = JSON.parse(raw) as User;
-      if (u.id === userId) return u;
+      const user = JSON.parse(raw) as User;
+      if (user.id === userId) return user;
     }
-  } catch {}
-  
-  return MOCK_USERS.find(u => u.id === userId) ?? {
-    id: userId,
-    name: 'Unknown User',
-    username: 'unknown',
-    email: 'unknown@example.com',
-    phone_verified: false,
-    email_verified: true,
-    is_private: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+  } catch {
+    // ignore
+  }
+
+  const user = getMockUserById(userId);
+  if (!user) {
+    return {
+      id: userId,
+      name: 'Unknown User',
+      username: 'unknown',
+      email: 'unknown@example.com',
+      phone_verified: false,
+      email_verified: true,
+      is_private: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  return {
+    ...user,
+    phone: user.phone ?? undefined,
+    bio: user.bio ?? undefined,
+    avatar_url: user.avatar_url ?? undefined,
   };
 };
 
-const isBlocked = (userA: string, userB: string): boolean => {
-  return mockBlocks.some(
-    b => (b.blocker_id === userA && b.blocked_id === userB) ||
-         (b.blocker_id === userB && b.blocked_id === userA)
+const isBlocked = (userA: string, userB: string): boolean =>
+  mockBlocks.some(
+    (block) =>
+      (block.blocker_id === userA && block.blocked_id === userB) ||
+      (block.blocker_id === userB && block.blocked_id === userA)
   );
-};
 
-const isFollowing = (followerId: string, followingId: string): boolean => {
-  return mockFollows.some(
-    f => f.follower_id === followerId && f.following_id === followingId && f.status === 'accepted'
+const isFollowing = (followerId: string, followingId: string): boolean =>
+  mockFollows.some(
+    (follow) =>
+      follow.follower_id === followerId &&
+      follow.following_id === followingId &&
+      follow.status === 'accepted'
   );
-};
 
-// ============================================================
-// Service Methods
-// ============================================================
-
-/**
- * GET /search/users?q=
- * Cari pengguna berdasarkan username atau nama.
- * SRCH-01: Tidak menampilkan akun yang diblokir/memblokir.
- */
 export const searchUsers = async (query: string, currentUserId: string): Promise<User[]> => {
   await delay(400);
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
 
-  // Ambil semua pengguna terdaftar (termasuk sync localStorage jika user mengganti profilenya)
-  const currentSyncUser = getUserObject(currentUserId);
-  const usersList = MOCK_USERS.map(u => u.id === currentUserId ? currentSyncUser : getUserObject(u.id));
+  const currentUser = getUserObject(currentUserId);
+  const usersList = MOCK_USERS.map((user) =>
+    user.id === currentUserId ? currentUser : getUserObject(user.id)
+  );
 
-  return usersList.filter(user => {
-    // Jangan tampilkan diri sendiri di pencarian
+  return usersList.filter((user) => {
     if (user.id === currentUserId) return false;
-    
-    // SRCH-01: Filter block
     if (isBlocked(currentUserId, user.id)) return false;
 
-    // Cocokkan nama atau username
     return (
-      user.name.toLowerCase().includes(q) ||
-      user.username.toLowerCase().includes(q)
+      user.name.toLowerCase().includes(normalizedQuery) ||
+      user.username.toLowerCase().includes(normalizedQuery)
     );
   });
 };
 
-/**
- * GET /search/hashtags?q=
- * Cari hashtag unik dari postingan yang ada.
- */
 export const searchHashtags = async (query: string): Promise<string[]> => {
   await delay(300);
-  const q = query.trim().toLowerCase().replace('#', '');
-  if (!q) return [];
+  const normalizedQuery = query.trim().toLowerCase().replace('#', '');
+  if (!normalizedQuery) return [];
 
-  const posts = getPostsDb().filter(p => !p.deleted_at);
   const hashtags = new Set<string>();
+  getPostsDb()
+    .filter((post) => !post.deleted_at)
+    .forEach((post) => {
+      const matches = post.caption?.match(/#[a-zA-Z0-9_]+/g);
+      if (!matches) return;
 
-  posts.forEach(post => {
-    if (!post.caption) return;
-    const matches = post.caption.match(/#[a-zA-Z0-9_]+/g);
-    if (matches) {
-      matches.forEach(tag => {
+      matches.forEach((tag) => {
         const cleanTag = tag.replace('#', '');
-        if (cleanTag.toLowerCase().includes(q)) {
+        if (cleanTag.toLowerCase().includes(normalizedQuery)) {
           hashtags.add(cleanTag);
         }
       });
-    }
-  });
+    });
 
   return Array.from(hashtags);
 };
 
-/**
- * GET /hashtags/:tag/posts
- * Daftar post dengan hashtag tertentu.
- * SRCH-02: Post dari akun privat tidak muncul untuk non-follower.
- */
 export const getHashtagPosts = async (tag: string, currentUserId: string): Promise<Post[]> => {
   await delay(450);
   const cleanTag = tag.trim().toLowerCase().replace('#', '');
   if (!cleanTag) return [];
 
-  const posts = getPostsDb().filter(p => !p.deleted_at && !p.is_archived);
-  const media = getMediaDb();
-  const likes = getLikesDb();
-  const comments = getCommentsDb();
-  const saved = getSavedDb();
+  return getPostsDb()
+    .filter((post) => {
+      if (post.deleted_at || post.is_archived || !post.caption) return false;
+      if (isBlocked(currentUserId, post.user_id)) return false;
 
-  const matchedPosts = posts.filter(post => {
-    if (!post.caption) return false;
-    
-    // Cek block (SRCH-01)
-    if (isBlocked(currentUserId, post.user_id)) return false;
+      const author = getUserObject(post.user_id);
+      if (
+        author.is_private &&
+        post.user_id !== currentUserId &&
+        !isFollowing(currentUserId, post.user_id)
+      ) {
+        return false;
+      }
 
-    // Cek privasi (SRCH-02)
-    const author = getUserObject(post.user_id);
-    if (author.is_private && post.user_id !== currentUserId && !isFollowing(currentUserId, post.user_id)) {
-      return false;
-    }
+      return new RegExp(`#${cleanTag}\\b`, 'i').test(post.caption);
+    })
+    .map((post) => {
+      const media = getMediaDb().filter((entry) => entry.post_id === post.id);
+      const likes = getLikesDb().filter((entry) => entry.post_id === post.id);
+      const comments = getCommentsDb().filter(
+        (entry) => entry.post_id === post.id && !entry.deleted_at
+      );
+      const saved = getSavedDb().filter(
+        (entry) => entry.user_id === currentUserId && entry.post_id === post.id
+      );
 
-    // Cek hashtag match
-    const tagRegex = new RegExp(`#${cleanTag}\\b`, 'i');
-    return tagRegex.test(post.caption);
-  });
-
-  // Enrich posts
-  return matchedPosts.map(post => {
-    const postMedia = media.filter(m => m.post_id === post.id);
-    const postLikes = likes.filter(l => l.post_id === post.id);
-    const postComments = comments.filter(c => c.post_id === post.id && !c.deleted_at);
-    const postSaved = saved.filter(s => s.user_id === currentUserId && s.post_id === post.id);
-
-    return {
-      ...post,
-      user: getUserObject(post.user_id),
-      media: postMedia,
-      likes_count: postLikes.length,
-      comments_count: postComments.length,
-      is_liked: likes.some(l => l.user_id === currentUserId && l.post_id === post.id),
-      is_saved: postSaved.length > 0,
-    };
-  });
+      return {
+        ...post,
+        user: getUserObject(post.user_id),
+        media,
+        likes_count: likes.length,
+        comments_count: comments.length,
+        is_liked: likes.some(
+          (entry) => entry.user_id === currentUserId && entry.post_id === post.id
+        ),
+        is_saved: saved.length > 0,
+      };
+    });
 };

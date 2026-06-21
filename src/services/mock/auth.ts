@@ -1,6 +1,6 @@
 /**
  * Mock Auth Service
- * Ref: SRS §3.1–3.4, §3.6, API endpoints §11.1
+ * Ref: SRS §3.1-3.4, §3.6, API endpoints §11.1
  *
  * Seluruh method mengikuti kontrak endpoint SRS §11.1 sehingga
  * di Fase 7 tinggal ganti implementasi internal dengan axios call
@@ -23,51 +23,12 @@ import type {
   RecoverUsernamePayload,
   RecoverEmailPayload,
 } from '../../types/auth';
-
-// ============================================================
-// Mock Users Database
-// ============================================================
-
-const MOCK_USERS: User[] = [
-  {
-    id: 'user-001',
-    name: 'Faris Akbar',
-    username: 'farisakbar28',
-    email: 'faris@example.com',
-    phone: '+628123456789',
-    phone_verified: true,
-    email_verified: true,
-    bio: 'Building Twistgram 🚀',
-    avatar_url: null,
-    is_private: false,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-06-01T00:00:00Z',
-  },
-  {
-    id: 'user-002',
-    name: 'Clara Clarissa',
-    username: 'claraclarissa',
-    email: 'clara@example.com',
-    phone: null,
-    phone_verified: false,
-    email_verified: true,
-    bio: null,
-    avatar_url: null,
-    is_private: true,
-    created_at: '2026-02-01T00:00:00Z',
-    updated_at: '2026-06-10T00:00:00Z',
-  },
-];
-
-/** Password mock — key: user id, value: password plain (simulasi only) */
-const MOCK_PASSWORDS: Record<string, string> = {
-  'user-001': 'Password123',
-  'user-002': 'Secret456!',
-};
-
-// ============================================================
-// Storage helpers
-// ============================================================
+import {
+  getMockUserByEmail,
+  getMockUserByUsername,
+  mockDb,
+  persistMockDb,
+} from './database';
 
 const STORAGE_KEY_USER = 'twistgram_user';
 const STORAGE_KEY_TOKENS = 'twistgram_tokens';
@@ -98,15 +59,11 @@ export const storageClearSession = () => {
   localStorage.removeItem(STORAGE_KEY_TOKENS);
 };
 
-// ============================================================
-// OTP Store (simulasi in-memory — di production ada di backend)
-// ============================================================
-
 interface OtpEntry {
   code: string;
   purpose: string;
   identifier: string;
-  expiresAt: number; // timestamp ms
+  expiresAt: number;
   used: boolean;
 }
 
@@ -122,11 +79,10 @@ const saveOtp = (purpose: string, identifier: string): string => {
     code,
     purpose,
     identifier,
-    expiresAt: Date.now() + 10 * 60 * 1000, // AUTH-03: 10 menit
+    expiresAt: Date.now() + 10 * 60 * 1000,
     used: false,
   };
-  // Console log untuk debug di development — di production dikirim via email
-  console.info(`[Mock OTP] ${purpose} → ${identifier} : ${code}`);
+  console.info(`[Mock OTP] ${purpose} -> ${identifier} : ${code}`);
   return code;
 };
 
@@ -139,17 +95,15 @@ const validateOtp = (
   const entry = otpStore[key];
 
   if (!entry) return { valid: false, reason: 'OTP tidak ditemukan.' };
-  if (entry.used) return { valid: false, reason: 'OTP sudah digunakan.' }; // AUTH-03
+  if (entry.used) return { valid: false, reason: 'OTP sudah digunakan.' };
   if (Date.now() > entry.expiresAt) return { valid: false, reason: 'OTP sudah kadaluarsa.' };
-  if (entry.code !== code && code !== '123456') return { valid: false, reason: 'Kode OTP tidak valid.' };
+  if (entry.code !== code && code !== '123456') {
+    return { valid: false, reason: 'Kode OTP tidak valid.' };
+  }
 
-  otpStore[key].used = true; // AUTH-03: hanya sekali pakai
+  otpStore[key].used = true;
   return { valid: true };
 };
-
-// ============================================================
-// Failed Login Counter (simulasi AUTH-04)
-// ============================================================
 
 interface FailedAttempt {
   count: number;
@@ -157,18 +111,19 @@ interface FailedAttempt {
 }
 
 const failedAttempts: Record<string, FailedAttempt> = {};
-
 const MAX_ATTEMPTS = 5;
-const COOLDOWN_MS = 15 * 60 * 1000; // 15 menit
+const COOLDOWN_MS = 15 * 60 * 1000;
 
 export const getLoginLockState = (identifier: string): { locked: boolean; remainingMs: number } => {
   const entry = failedAttempts[identifier];
   if (!entry?.lockedUntil) return { locked: false, remainingMs: 0 };
+
   const remaining = entry.lockedUntil - Date.now();
   if (remaining <= 0) {
     failedAttempts[identifier] = { count: 0, lockedUntil: null };
     return { locked: false, remainingMs: 0 };
   }
+
   return { locked: true, remainingMs: remaining };
 };
 
@@ -176,7 +131,7 @@ const recordFailedAttempt = (identifier: string) => {
   const entry = failedAttempts[identifier] ?? { count: 0, lockedUntil: null };
   entry.count += 1;
   if (entry.count >= MAX_ATTEMPTS) {
-    entry.lockedUntil = Date.now() + COOLDOWN_MS; // AUTH-04
+    entry.lockedUntil = Date.now() + COOLDOWN_MS;
   }
   failedAttempts[identifier] = entry;
 };
@@ -185,30 +140,21 @@ const resetFailedAttempts = (identifier: string) => {
   failedAttempts[identifier] = { count: 0, lockedUntil: null };
 };
 
-// ============================================================
-// Auth Service Methods
-// ============================================================
-
-/** POST /auth/login — SRS §11.1 */
 export const authLogin = async (payload: LoginPayload): Promise<LoginResponse> => {
   await delay(600);
 
   const { identifier, password } = payload;
-
-  // AUTH-04: cek lock state
   const lockState = getLoginLockState(identifier);
   if (lockState.locked) {
     const mins = Math.ceil(lockState.remainingMs / 60000);
     throw new Error(`Terlalu banyak percobaan login. Coba lagi dalam ${mins} menit.`);
   }
 
-  // Cari user berdasarkan email atau username
-  const user = MOCK_USERS.find(
-    (u) => u.email === identifier || u.username === identifier
+  const user = mockDb.users.find(
+    (candidate) => candidate.email === identifier || candidate.username === identifier
   );
 
-  // AUTH-02 (Business Rule §3.2): pesan error generik — tidak boleh bocorkan info
-  if (!user || MOCK_PASSWORDS[user.id] !== password) {
+  if (!user || mockDb.passwords[user.id] !== password) {
     recordFailedAttempt(identifier);
     throw new Error('Kredensial tidak valid. Periksa kembali email/username dan kata sandi Anda.');
   }
@@ -226,51 +172,48 @@ export const authLogin = async (payload: LoginPayload): Promise<LoginResponse> =
   };
 };
 
-/** POST /auth/logout — SRS §11.1 */
 export const authLogout = async (): Promise<void> => {
   await delay(200);
   storageClearSession();
 };
 
-/** POST /auth/register — SRS §11.1, §3.1 */
 export const authRegister = async (payload: RegisterPayload): Promise<RegisterResponse> => {
   await delay(800);
 
-  const { email, username } = payload;
-
-  // Validasi keunikan (simulasi real-time check §3.1)
-  if (MOCK_USERS.find((u) => u.email === email)) {
+  if (getMockUserByEmail(payload.email)) {
     throw new Error('Email sudah terdaftar. Gunakan email lain.');
   }
-  if (MOCK_USERS.find((u) => u.username === username)) {
+  if (getMockUserByUsername(payload.username)) {
     throw new Error('Username sudah digunakan. Pilih username lain.');
   }
 
+  const timestamp = Date.now();
   const newUser: User = {
-    id: `user-${Date.now()}`,
+    id: `user-${timestamp}`,
     name: payload.name,
     username: payload.username,
     email: payload.email,
     phone: payload.phone ?? null,
     phone_verified: false,
-    email_verified: false, // AUTH-02: harus verifikasi OTP dulu
+    email_verified: false,
     bio: null,
     avatar_url: null,
     is_private: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: new Date(timestamp).toISOString(),
+    updated_at: new Date(timestamp).toISOString(),
   };
 
-  MOCK_USERS.push(newUser);
-  MOCK_PASSWORDS[newUser.id] = payload.password;
+  mockDb.users.push(newUser);
+  mockDb.passwords[newUser.id] = payload.password;
+  mockDb.postCounts[newUser.id] = 0;
+  mockDb.userInterests[newUser.id] = [];
+  persistMockDb();
 
-  // Kirim OTP verifikasi (mock — tampil di console)
   saveOtp('register', payload.email);
 
   return { user: newUser, email_verified: false };
 };
 
-/** POST /auth/verify-otp — SRS §11.1 */
 export const authVerifyOtp = async (payload: VerifyOtpPayload): Promise<OtpVerifyResponse> => {
   await delay(500);
 
@@ -281,92 +224,78 @@ export const authVerifyOtp = async (payload: VerifyOtpPayload): Promise<OtpVerif
     throw new Error(result.reason ?? 'Kode OTP tidak valid.');
   }
 
-  // Tandai email_verified jika tujuan register
   if (purpose === 'register') {
-    const user = MOCK_USERS.find((u) => u.email === identifier);
-    if (user) user.email_verified = true;
+    const user = getMockUserByEmail(identifier);
+    if (user) {
+      user.email_verified = true;
+      user.updated_at = new Date().toISOString();
+      persistMockDb();
+    }
   }
 
-  // Untuk reset_password: kembalikan resetToken sementara
   if (purpose === 'reset_password') {
     return { success: true, resetToken: `reset_${identifier}_${Date.now()}` };
   }
 
-  // Untuk recover_username: kembalikan username
   if (purpose === 'recover_username') {
-    const user = MOCK_USERS.find((u) => u.email === identifier);
+    const user = getMockUserByEmail(identifier);
     return { success: true, username: user?.username };
   }
 
-  // Untuk recover_email: kembalikan masked email
   if (purpose === 'recover_email') {
-    const user = MOCK_USERS.find((u) => u.username === identifier);
+    const user = getMockUserByUsername(identifier);
     if (user) {
       const [local, domain] = user.email.split('@');
-      const masked = `${local[0]}***@${domain}`;
-      return { success: true, maskedEmail: masked };
+      return { success: true, maskedEmail: `${local[0]}***@${domain}` };
     }
   }
 
   return { success: true };
 };
 
-/** POST /auth/forgot-password — SRS §11.1, §3.3 */
 export const authForgotPassword = async (payload: ForgotPasswordPayload): Promise<void> => {
   await delay(700);
 
-  const user = MOCK_USERS.find((u) => u.email === payload.email);
-  // Selalu return success — tidak bocorkan apakah email terdaftar
-  if (user) {
+  if (getMockUserByEmail(payload.email)) {
     saveOtp('reset_password', payload.email);
   }
 };
 
-/** POST /auth/reset-password — SRS §11.1, §3.3 */
 export const authResetPassword = async (payload: ResetPasswordPayload): Promise<void> => {
   await delay(600);
 
-  // Validasi resetToken format (mock: harus mengandung 'reset_')
   if (!payload.resetToken.startsWith('reset_')) {
     throw new Error('Token reset tidak valid atau sudah kadaluarsa.');
   }
 
-  // AUTH-05: invalidate seluruh sesi aktif
   storageClearSession();
 };
 
-/** POST /auth/recover-username — SRS §11.1, §3.4 Skenario A */
 export const authRecoverUsername = async (payload: RecoverUsernamePayload): Promise<void> => {
   await delay(700);
 
-  const user = MOCK_USERS.find((u) => u.email === payload.email);
-  if (user) {
+  if (getMockUserByEmail(payload.email)) {
     saveOtp('recover_username', payload.email);
   }
-  // Selalu return success — tidak bocorkan info email
 };
 
-/** POST /auth/recover-email — SRS §11.1, §3.4 Skenario B */
 export const authRecoverEmail = async (payload: RecoverEmailPayload): Promise<void> => {
   await delay(700);
 
-  const user = MOCK_USERS.find(
-    (u) => u.username === payload.username && u.phone === payload.phone
+  const user = mockDb.users.find(
+    (candidate) => candidate.username === payload.username && candidate.phone === payload.phone
   );
   if (user && user.phone_verified) {
     saveOtp('recover_email', payload.username);
   }
-  // Selalu return success
 };
 
-/** GET /users/:username — cek ketersediaan username (§3.1 real-time check) */
 export const checkUsernameAvailable = async (username: string): Promise<boolean> => {
   await delay(300);
-  return !MOCK_USERS.find((u) => u.username === username);
+  return !getMockUserByUsername(username);
 };
 
-/** Cek ketersediaan email (§3.1 real-time check) */
 export const checkEmailAvailable = async (email: string): Promise<boolean> => {
   await delay(300);
-  return !MOCK_USERS.find((u) => u.email === email);
+  return !getMockUserByEmail(email);
 };

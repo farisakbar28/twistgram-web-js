@@ -1,13 +1,7 @@
 /**
  * Mock Social Service
- * Ref: SRS §4 (Profile, Privacy, Social), §10.1–10.4 (DB schema)
+ * Ref: SRS §4 (Profile, Privacy, Social), §10.1-10.4 (DB schema)
  *      API contracts: §11.2 (Users & Profile), §11.3 (Follow & Social)
- *
- * Seluruh method mengikuti kontrak endpoint SRS §11.2–11.3 sehingga
- * di Fase 7 tinggal ganti implementasi internal dengan axios call
- * tanpa mengubah signature yang dipakai komponen.
- *
- * Storage: in-memory untuk sesi ini (reset saat page refresh — simulasi server state)
  */
 
 import { delay } from '../../utils';
@@ -21,142 +15,19 @@ import type {
   UpdatePrivacyPayload,
   ReportPayload,
 } from '../../types/social';
+import { getMockUserById, mockDb, persistMockDb } from './database';
 
-// ============================================================
-// Mock Database
-// ============================================================
-
-/** Referensi ke mock users dari auth service — diimpor untuk cross-reference */
-export const MOCK_USERS: User[] = [
-  {
-    id: 'user-001',
-    name: 'Faris Akbar',
-    username: 'farisakbar28',
-    email: 'faris@example.com',
-    phone: '+628123456789',
-    phone_verified: true,
-    email_verified: true,
-    bio: 'Building Twistgram 🚀 | Frontend Developer',
-    avatar_url: undefined,
-    is_private: false,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-06-01T00:00:00Z',
-  },
-  {
-    id: 'user-002',
-    name: 'Clara Clarissa',
-    username: 'claraclarissa',
-    email: 'clara@example.com',
-    phone: undefined,
-    phone_verified: false,
-    email_verified: true,
-    bio: 'Photographer & Content Creator 📸',
-    avatar_url: undefined,
-    is_private: true,
-    created_at: '2026-02-01T00:00:00Z',
-    updated_at: '2026-06-10T00:00:00Z',
-  },
-  {
-    id: 'user-003',
-    name: 'Andi Wirawan',
-    username: 'andiwirawan',
-    email: 'andi@example.com',
-    phone: undefined,
-    phone_verified: false,
-    email_verified: true,
-    bio: 'Travel & kuliner 🌍',
-    avatar_url: undefined,
-    is_private: false,
-    created_at: '2026-03-01T00:00:00Z',
-    updated_at: '2026-06-15T00:00:00Z',
-  },
-  {
-    id: 'user-004',
-    name: 'Siti Rahayu',
-    username: 'sitirahayu',
-    email: 'siti@example.com',
-    phone: undefined,
-    phone_verified: false,
-    email_verified: true,
-    bio: undefined,
-    avatar_url: undefined,
-    is_private: false,
-    created_at: '2026-04-01T00:00:00Z',
-    updated_at: '2026-06-18T00:00:00Z',
-  },
-  {
-    id: 'user-005',
-    name: 'Budi Santoso',
-    username: 'budisantoso',
-    email: 'budi@example.com',
-    phone: undefined,
-    phone_verified: false,
-    email_verified: true,
-    bio: 'Tech enthusiast 💻',
-    avatar_url: undefined,
-    is_private: true,
-    created_at: '2026-05-01T00:00:00Z',
-    updated_at: '2026-06-20T00:00:00Z',
-  },
-];
-
-/** Mock post counts per user */
-const MOCK_POST_COUNTS: Record<string, number> = {
-  'user-001': 24,
-  'user-002': 57,
-  'user-003': 12,
-  'user-004': 8,
-  'user-005': 31,
-};
-
-/** Mock interests per user */
-const MOCK_USER_INTERESTS: Record<string, string[]> = {
-  'user-001': ['Teknologi', 'Gaming', 'Fotografi'],
-  'user-002': ['Fotografi', 'Seni & Desain', 'Fashion'],
-  'user-003': ['Travel', 'Kuliner'],
-  'user-004': ['Musik', 'Film & Seri'],
-  'user-005': ['Teknologi', 'Bisnis'],
-};
-
-/**
- * Mock follows table — setiap entry: { followerId, followingId, status }
- * user-001 follows user-002 (pending - karena privat), user-003, user-004
- * user-002 follows user-001
- * user-003 follows user-001
- * user-005 (privat) punya pending request dari user-004
- */
-export interface MockFollow {
-  id: string;
-  follower_id: string;
-  following_id: string;
-  status: 'accepted' | 'pending';
-  is_close_friend: boolean;
-  created_at: string;
-}
-
-export const mockFollows: MockFollow[] = [
-  { id: 'follow-001', follower_id: 'user-001', following_id: 'user-002', status: 'pending', is_close_friend: false, created_at: '2026-06-01T00:00:00Z' },
-  { id: 'follow-002', follower_id: 'user-001', following_id: 'user-003', status: 'accepted', is_close_friend: false, created_at: '2026-06-02T00:00:00Z' },
-  { id: 'follow-003', follower_id: 'user-001', following_id: 'user-004', status: 'accepted', is_close_friend: false, created_at: '2026-06-03T00:00:00Z' },
-  { id: 'follow-004', follower_id: 'user-002', following_id: 'user-001', status: 'accepted', is_close_friend: false, created_at: '2026-06-01T00:00:00Z' },
-  { id: 'follow-005', follower_id: 'user-003', following_id: 'user-001', status: 'accepted', is_close_friend: false, created_at: '2026-06-04T00:00:00Z' },
-  { id: 'follow-006', follower_id: 'user-004', following_id: 'user-005', status: 'pending', is_close_friend: false, created_at: '2026-06-10T00:00:00Z' },
-  { id: 'follow-007', follower_id: 'user-003', following_id: 'user-004', status: 'accepted', is_close_friend: false, created_at: '2026-06-05T00:00:00Z' },
-];
-
-/** Mock blocks */
-export interface MockBlock {
+export type MockFollow = Follow;
+export type MockBlock = {
   id: string;
   blocker_id: string;
   blocked_id: string;
   created_at: string;
-}
+};
 
-export const mockBlocks: MockBlock[] = [];
-
-// ============================================================
-// Storage helpers for currentUser updates
-// ============================================================
+export const MOCK_USERS = mockDb.users as unknown as User[];
+export const mockFollows = mockDb.follows as MockFollow[];
+export const mockBlocks = mockDb.blocks as MockBlock[];
 
 const STORAGE_KEY_USER = 'twistgram_user';
 
@@ -172,147 +43,133 @@ const storageUpdateUser = (updates: Partial<User>) => {
   }
 };
 
-// ============================================================
-// Helpers
-// ============================================================
+const normalizeUser = (user: typeof mockDb.users[number]): User => ({
+  ...user,
+  phone: user.phone ?? undefined,
+  bio: user.bio ?? undefined,
+  avatar_url: user.avatar_url ?? undefined,
+});
 
 const getFollowEntry = (followerId: string, followingId: string): MockFollow | undefined =>
-  mockFollows.find(f => f.follower_id === followerId && f.following_id === followingId);
+  mockFollows.find(
+    (follow) => follow.follower_id === followerId && follow.following_id === followingId
+  );
+
+const isBlockedRelation = (userA: string, userB: string) =>
+  mockBlocks.some(
+    (block) =>
+      (block.blocker_id === userA && block.blocked_id === userB) ||
+      (block.blocker_id === userB && block.blocked_id === userA)
+  );
 
 const getFollowStatus = (currentUserId: string | null, targetUserId: string): FollowStatus => {
   if (!currentUserId) return 'not_following';
-
-  // Cek block (SOC-02: mutual)
-  const isBlocked = mockBlocks.some(
-    b => (b.blocker_id === currentUserId && b.blocked_id === targetUserId) ||
-         (b.blocker_id === targetUserId && b.blocked_id === currentUserId)
-  );
-  if (isBlocked) return 'blocked';
+  if (isBlockedRelation(currentUserId, targetUserId)) return 'blocked';
 
   const follow = getFollowEntry(currentUserId, targetUserId);
   if (!follow) return 'not_following';
-  if (follow.status === 'pending') return 'pending';
-  return 'following';
+  return follow.status === 'pending' ? 'pending' : 'following';
 };
 
 const countFollowers = (userId: string): number =>
-  mockFollows.filter(f => f.following_id === userId && f.status === 'accepted').length;
+  mockFollows.filter((follow) => follow.following_id === userId && follow.status === 'accepted')
+    .length;
 
 const countFollowing = (userId: string): number =>
-  mockFollows.filter(f => f.follower_id === userId && f.status === 'accepted').length;
+  mockFollows.filter((follow) => follow.follower_id === userId && follow.status === 'accepted')
+    .length;
 
-// ============================================================
-// Profile Service — SRS §11.2
-// ============================================================
+const buildUserProfile = (user: typeof mockDb.users[number], currentUserId: string | null): UserProfile => ({
+  ...normalizeUser(user),
+  post_count: mockDb.postCounts[user.id] ?? 0,
+  follower_count: countFollowers(user.id),
+  following_count: countFollowing(user.id),
+  follow_status: currentUserId === user.id ? 'not_following' : getFollowStatus(currentUserId, user.id),
+  is_own_profile: currentUserId === user.id,
+  interests: mockDb.userInterests[user.id] ?? [],
+});
 
-/** GET /users/me */
 export const getMyProfile = async (currentUserId: string): Promise<UserProfile> => {
   await delay(400);
-  const user = MOCK_USERS.find(u => u.id === currentUserId);
+  const user = getMockUserById(currentUserId);
   if (!user) throw new Error('User tidak ditemukan.');
-  return {
-    ...user,
-    post_count: MOCK_POST_COUNTS[user.id] ?? 0,
-    follower_count: countFollowers(user.id),
-    following_count: countFollowing(user.id),
-    follow_status: 'not_following',
-    is_own_profile: true,
-    interests: MOCK_USER_INTERESTS[user.id] ?? [],
-  };
+  return buildUserProfile(user, currentUserId);
 };
 
-/** GET /users/:username */
 export const getProfileByUsername = async (
   username: string,
   currentUserId: string | null
 ): Promise<UserProfile> => {
   await delay(500);
-  const user = MOCK_USERS.find(u => u.username === username);
+  const user = mockDb.users.find((candidate) => candidate.username === username);
   if (!user) throw new Error('Profil tidak ditemukan.');
 
-  // Cek block (SOC-02)
-  if (currentUserId) {
-    const blocked = mockBlocks.some(
-      b => (b.blocker_id === currentUserId && b.blocked_id === user.id) ||
-           (b.blocker_id === user.id && b.blocked_id === currentUserId)
-    );
-    if (blocked) throw new Error('Profil tidak dapat dilihat.');
+  if (currentUserId && isBlockedRelation(currentUserId, user.id)) {
+    throw new Error('Profil tidak dapat dilihat.');
   }
 
-  return {
-    ...user,
-    post_count: MOCK_POST_COUNTS[user.id] ?? 0,
-    follower_count: countFollowers(user.id),
-    following_count: countFollowing(user.id),
-    follow_status: getFollowStatus(currentUserId, user.id),
-    is_own_profile: currentUserId === user.id,
-    interests: MOCK_USER_INTERESTS[user.id] ?? [],
-  };
+  return buildUserProfile(user, currentUserId);
 };
 
-/** PATCH /users/me — update profil */
 export const updateProfile = async (
   currentUserId: string,
   payload: UpdateProfilePayload
 ): Promise<User> => {
   await delay(600);
-  const userIdx = MOCK_USERS.findIndex(u => u.id === currentUserId);
-  if (userIdx === -1) throw new Error('User tidak ditemukan.');
+  const userIndex = mockDb.users.findIndex((user) => user.id === currentUserId);
+  if (userIndex === -1) throw new Error('User tidak ditemukan.');
 
-  // SOC-05: cek username change (1x per bulan) — simulasi: selalu boleh di mock
   if (payload.username) {
-    const taken = MOCK_USERS.find(u => u.username === payload.username && u.id !== currentUserId);
+    const taken = mockDb.users.find(
+      (user) => user.username === payload.username && user.id !== currentUserId
+    );
     if (taken) throw new Error('Username sudah digunakan oleh pengguna lain.');
   }
 
-  const updated: User = {
-    ...MOCK_USERS[userIdx],
+  const updated = {
+    ...mockDb.users[userIndex],
     ...(payload.name !== undefined && { name: payload.name }),
     ...(payload.username !== undefined && { username: payload.username }),
     ...(payload.bio !== undefined && { bio: payload.bio }),
     ...(payload.avatar_url !== undefined && { avatar_url: payload.avatar_url }),
     updated_at: new Date().toISOString(),
   };
-  MOCK_USERS[userIdx] = updated;
 
-  // Sync ke localStorage agar ProtectedRoute / AuthContext ikut terupdate
-  storageUpdateUser(updated);
+  mockDb.users[userIndex] = updated;
+  persistMockDb();
+  storageUpdateUser(normalizeUser(updated));
 
-  return updated;
+  return normalizeUser(updated);
 };
 
-/** PATCH /users/me/privacy — toggle privasi */
 export const updatePrivacy = async (
   currentUserId: string,
   payload: UpdatePrivacyPayload
 ): Promise<void> => {
   await delay(400);
-  const userIdx = MOCK_USERS.findIndex(u => u.id === currentUserId);
-  if (userIdx === -1) throw new Error('User tidak ditemukan.');
-  MOCK_USERS[userIdx] = { ...MOCK_USERS[userIdx], is_private: payload.is_private };
+  const user = getMockUserById(currentUserId);
+  if (!user) throw new Error('User tidak ditemukan.');
+
+  user.is_private = payload.is_private;
+  user.updated_at = new Date().toISOString();
+  persistMockDb();
   storageUpdateUser({ is_private: payload.is_private });
 };
 
-/** GET /users/me/interests */
 export const getInterests = async (currentUserId: string): Promise<string[]> => {
   await delay(300);
-  return MOCK_USER_INTERESTS[currentUserId] ?? [];
+  return mockDb.userInterests[currentUserId] ?? [];
 };
 
-/** PUT /users/me/interests */
 export const updateInterests = async (
   currentUserId: string,
   categories: string[]
 ): Promise<void> => {
   await delay(400);
-  MOCK_USER_INTERESTS[currentUserId] = categories;
+  mockDb.userInterests[currentUserId] = categories;
+  persistMockDb();
 };
 
-// ============================================================
-// Follow Service — SRS §11.3
-// ============================================================
-
-/** POST /users/:id/follow */
 export const followUser = async (
   currentUserId: string,
   targetUserId: string
@@ -320,219 +177,171 @@ export const followUser = async (
   await delay(400);
 
   if (currentUserId === targetUserId) throw new Error('Tidak bisa follow diri sendiri.');
+  if (getFollowEntry(currentUserId, targetUserId)) {
+    throw new Error('Sudah follow pengguna ini.');
+  }
 
-  const existing = getFollowEntry(currentUserId, targetUserId);
-  if (existing) throw new Error('Sudah follow pengguna ini.');
-
-  const target = MOCK_USERS.find(u => u.id === targetUserId);
+  const target = getMockUserById(targetUserId);
   if (!target) throw new Error('Pengguna tidak ditemukan.');
 
   const newFollow: MockFollow = {
     id: `follow-${Date.now()}`,
     follower_id: currentUserId,
     following_id: targetUserId,
-    // SOC-01: jika akun privat, status = pending
     status: target.is_private ? 'pending' : 'accepted',
     is_close_friend: false,
     created_at: new Date().toISOString(),
   };
-  mockFollows.push(newFollow);
 
-  // Memicu notifikasi in-app
+  mockFollows.push(newFollow);
+  persistMockDb();
+
   try {
     const { createNotification } = await import('./notification');
-    const type = target.is_private ? 'follow_request' : 'follow';
-    await createNotification(targetUserId, currentUserId, type);
-  } catch {}
+    await createNotification(
+      targetUserId,
+      currentUserId,
+      target.is_private ? 'follow_request' : 'follow'
+    );
+  } catch {
+    // ignore mock notification failure
+  }
 
   return newFollow;
 };
 
-/** DELETE /users/:id/follow */
 export const unfollowUser = async (
   currentUserId: string,
   targetUserId: string
 ): Promise<void> => {
   await delay(400);
-  const idx = mockFollows.findIndex(
-    f => f.follower_id === currentUserId && f.following_id === targetUserId
+  const index = mockFollows.findIndex(
+    (follow) => follow.follower_id === currentUserId && follow.following_id === targetUserId
   );
-  if (idx === -1) throw new Error('Belum follow pengguna ini.');
-  mockFollows.splice(idx, 1);
+  if (index === -1) throw new Error('Belum follow pengguna ini.');
+  mockFollows.splice(index, 1);
+  persistMockDb();
 };
 
-/** GET /users/:id/followers */
 export const getFollowers = async (
   targetUserId: string,
   currentUserId: string | null
 ): Promise<UserProfile[]> => {
   await delay(500);
-  const followerIds = mockFollows
-    .filter(f => f.following_id === targetUserId && f.status === 'accepted')
-    .map(f => f.follower_id);
-
-  return followerIds
-    .map(id => {
-      const user = MOCK_USERS.find(u => u.id === id);
-      if (!user) return null;
-      return {
-        ...user,
-        post_count: MOCK_POST_COUNTS[user.id] ?? 0,
-        follower_count: countFollowers(user.id),
-        following_count: countFollowing(user.id),
-        follow_status: getFollowStatus(currentUserId, user.id),
-        is_own_profile: currentUserId === user.id,
-        interests: MOCK_USER_INTERESTS[user.id] ?? [],
-      } as UserProfile;
-    })
-    .filter(Boolean) as UserProfile[];
+  return mockFollows
+    .filter((follow) => follow.following_id === targetUserId && follow.status === 'accepted')
+    .map((follow) => getMockUserById(follow.follower_id))
+    .filter(Boolean)
+    .map((user) => buildUserProfile(user!, currentUserId));
 };
 
-/** GET /users/:id/following */
 export const getFollowing = async (
   targetUserId: string,
   currentUserId: string | null
 ): Promise<UserProfile[]> => {
   await delay(500);
-  const followingIds = mockFollows
-    .filter(f => f.follower_id === targetUserId && f.status === 'accepted')
-    .map(f => f.following_id);
-
-  return followingIds
-    .map(id => {
-      const user = MOCK_USERS.find(u => u.id === id);
-      if (!user) return null;
-      return {
-        ...user,
-        post_count: MOCK_POST_COUNTS[user.id] ?? 0,
-        follower_count: countFollowers(user.id),
-        following_count: countFollowing(user.id),
-        follow_status: getFollowStatus(currentUserId, user.id),
-        is_own_profile: currentUserId === user.id,
-        interests: MOCK_USER_INTERESTS[user.id] ?? [],
-      } as UserProfile;
-    })
-    .filter(Boolean) as UserProfile[];
+  return mockFollows
+    .filter((follow) => follow.follower_id === targetUserId && follow.status === 'accepted')
+    .map((follow) => getMockUserById(follow.following_id))
+    .filter(Boolean)
+    .map((user) => buildUserProfile(user!, currentUserId));
 };
 
-/** DELETE /users/me/followers/:id — Remove follower (SOC-04) */
 export const removeFollower = async (
   currentUserId: string,
   followerUserId: string
 ): Promise<void> => {
   await delay(400);
-  const idx = mockFollows.findIndex(
-    f => f.follower_id === followerUserId && f.following_id === currentUserId && f.status === 'accepted'
+  const index = mockFollows.findIndex(
+    (follow) =>
+      follow.follower_id === followerUserId &&
+      follow.following_id === currentUserId &&
+      follow.status === 'accepted'
   );
-  if (idx === -1) throw new Error('Pengguna ini bukan follower Anda.');
-  mockFollows.splice(idx, 1);
+  if (index === -1) throw new Error('Pengguna ini bukan follower Anda.');
+  mockFollows.splice(index, 1);
+  persistMockDb();
 };
 
-// ============================================================
-// Follow Requests — SRS §4.2, §11.3
-// ============================================================
-
-/** GET /follow-requests */
 export const getFollowRequests = async (currentUserId: string): Promise<FollowRequest[]> => {
   await delay(400);
   return mockFollows
-    .filter(f => f.following_id === currentUserId && f.status === 'pending')
-    .map(f => {
-      const fromUser = MOCK_USERS.find(u => u.id === f.follower_id);
+    .filter((follow) => follow.following_id === currentUserId && follow.status === 'pending')
+    .map((follow) => {
+      const fromUser = getMockUserById(follow.follower_id);
       if (!fromUser) return null;
-      return { id: f.id, from_user: fromUser, created_at: f.created_at } as FollowRequest;
+      return {
+        id: follow.id,
+        from_user: normalizeUser(fromUser),
+        created_at: follow.created_at,
+      } as FollowRequest;
     })
     .filter(Boolean) as FollowRequest[];
 };
 
-/** POST /follow-requests/:id/approve */
+const removeFollowRequestNotification = (follow: MockFollow) => {
+  const filtered = mockDb.notifications.filter(
+    (notification) =>
+      !(
+        notification.type === 'follow_request' &&
+        notification.actor_id === follow.follower_id &&
+        notification.recipient_id === follow.following_id
+      )
+  );
+
+  mockDb.notifications.splice(0, mockDb.notifications.length, ...filtered);
+};
+
 export const approveFollowRequest = async (requestId: string): Promise<void> => {
   await delay(400);
-  const follow = mockFollows.find(f => f.id === requestId);
+  const follow = mockFollows.find((entry) => entry.id === requestId);
   if (!follow || follow.status !== 'pending') throw new Error('Permintaan tidak ditemukan.');
-  follow.status = 'accepted';
 
-  // Memicu notifikasi in-app
+  follow.status = 'accepted';
+  removeFollowRequestNotification(follow);
+  persistMockDb();
+
   try {
     const { createNotification } = await import('./notification');
     await createNotification(follow.follower_id, follow.following_id, 'follow');
-  } catch {}
-
-  // BUG 4 fix: hapus notifikasi follow_request dari storage
-  try {
-    const raw = localStorage.getItem('twistgram_notifications');
-    if (raw) {
-      const notifs = JSON.parse(raw) as any[];
-      const filtered = notifs.filter(
-        n =>
-          !(
-            n.type === 'follow_request' &&
-            n.actor_id === follow.follower_id &&
-            n.recipient_id === follow.following_id
-          )
-      );
-      localStorage.setItem('twistgram_notifications', JSON.stringify(filtered));
-    }
-  } catch {}
+  } catch {
+    // ignore mock notification failure
+  }
 };
 
-/** POST /follow-requests/:id/decline */
 export const declineFollowRequest = async (requestId: string): Promise<void> => {
   await delay(400);
-  const follow = mockFollows.find(f => f.id === requestId && f.status === 'pending');
+  const follow = mockFollows.find((entry) => entry.id === requestId && entry.status === 'pending');
   if (!follow) throw new Error('Permintaan tidak ditemukan.');
 
-  const idx = mockFollows.findIndex(f => f.id === requestId && f.status === 'pending');
-  if (idx === -1) throw new Error('Permintaan tidak ditemukan.');
-  mockFollows.splice(idx, 1);
-
-  // BUG 4 fix: hapus notifikasi follow_request dari storage
-  try {
-    const raw = localStorage.getItem('twistgram_notifications');
-    if (raw) {
-      const notifs = JSON.parse(raw) as any[];
-      const filtered = notifs.filter(
-        n =>
-          !(
-            n.type === 'follow_request' &&
-            n.actor_id === follow.follower_id &&
-            n.recipient_id === follow.following_id
-          )
-      );
-      localStorage.setItem('twistgram_notifications', JSON.stringify(filtered));
-    }
-  } catch {}
+  const index = mockFollows.findIndex(
+    (entry) => entry.id === requestId && entry.status === 'pending'
+  );
+  mockFollows.splice(index, 1);
+  removeFollowRequestNotification(follow);
+  persistMockDb();
 };
 
-// ============================================================
-// Block & Report — SRS §4.5, §11.3
-// ============================================================
-
-/** POST /users/:id/block — SOC-02: mutual block */
 export const blockUser = async (
   currentUserId: string,
   targetUserId: string
 ): Promise<void> => {
   await delay(500);
+
   if (currentUserId === targetUserId) throw new Error('Tidak bisa memblock diri sendiri.');
+  if (mockBlocks.some((block) => block.blocker_id === currentUserId && block.blocked_id === targetUserId)) {
+    throw new Error('Pengguna sudah diblokir.');
+  }
 
-  const alreadyBlocked = mockBlocks.some(
-    b => b.blocker_id === currentUserId && b.blocked_id === targetUserId
-  );
-  if (alreadyBlocked) throw new Error('Pengguna sudah diblokir.');
-
-  // Hapus relasi follow kedua arah (SOC-02)
-  const toRemove: number[] = [];
-  mockFollows.forEach((f, idx) => {
+  for (let index = mockFollows.length - 1; index >= 0; index -= 1) {
+    const follow = mockFollows[index];
     if (
-      (f.follower_id === currentUserId && f.following_id === targetUserId) ||
-      (f.follower_id === targetUserId && f.following_id === currentUserId)
+      (follow.follower_id === currentUserId && follow.following_id === targetUserId) ||
+      (follow.follower_id === targetUserId && follow.following_id === currentUserId)
     ) {
-      toRemove.push(idx);
+      mockFollows.splice(index, 1);
     }
-  });
-  // Hapus dari belakang agar index tidak bergeser
-  toRemove.reverse().forEach(idx => mockFollows.splice(idx, 1));
+  }
 
   mockBlocks.push({
     id: `block-${Date.now()}`,
@@ -540,27 +349,26 @@ export const blockUser = async (
     blocked_id: targetUserId,
     created_at: new Date().toISOString(),
   });
+  persistMockDb();
 };
 
-/** DELETE /users/:id/block */
 export const unblockUser = async (
   currentUserId: string,
   targetUserId: string
 ): Promise<void> => {
   await delay(400);
-  const idx = mockBlocks.findIndex(
-    b => b.blocker_id === currentUserId && b.blocked_id === targetUserId
+  const index = mockBlocks.findIndex(
+    (block) => block.blocker_id === currentUserId && block.blocked_id === targetUserId
   );
-  if (idx === -1) throw new Error('Pengguna tidak sedang diblokir.');
-  mockBlocks.splice(idx, 1);
+  if (index === -1) throw new Error('Pengguna tidak sedang diblokir.');
+  mockBlocks.splice(index, 1);
+  persistMockDb();
 };
 
-/** POST /reports — Report user atau konten */
 export const reportContent = async (
   _currentUserId: string,
   payload: ReportPayload
 ): Promise<void> => {
   await delay(500);
-  // Mock: hanya log — di production disimpan ke tabel reports (§10.17)
   console.info('[Mock Report]', payload);
 };
