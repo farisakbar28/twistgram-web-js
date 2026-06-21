@@ -12,6 +12,7 @@
  */
 
 import axios from 'axios';
+import { getStoredAccessToken } from './session';
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1',
@@ -24,7 +25,7 @@ const apiClient = axios.create({
 // Request interceptor — attaches JWT access token to every request
 apiClient.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('access_token');
+    const token = getStoredAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -37,8 +38,8 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   response => response,
   async error => {
-    // TODO (Phase 7): Implement refresh token logic here
-    // if (error.response?.status === 401) { ... }
+    // TODO(backend): implement refresh token rotation + request retry
+    // once the real backend auth contract is available.
     return Promise.reject(error);
   }
 );

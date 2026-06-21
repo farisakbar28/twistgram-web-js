@@ -8,7 +8,8 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import type { User, LoginPayload, RegisterPayload } from '../../types/auth';
-import { storageGetUser, storageClearSession } from '../../services/mock/auth';
+import { storageClearSession } from '../../services/mock/auth';
+import { getStoredUser } from '../../services/session';
 
 // Fase 7: endpoint-service contract sudah dipindahkan ke src/services.
 // Namun AuthContext masih butuh helper penyimpanan lokal (storageGetUser/storageClearSession)
@@ -68,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Hydrate session dari localStorage saat mount
   useEffect(() => {
-    const saved = storageGetUser();
+    const saved = getStoredUser();
     setCurrentUser(saved);
     setIsLoading(false);
   }, []);
@@ -77,7 +78,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const response = await authLoginFromService(payload);
-
       setCurrentUser(response.user);
     } finally {
       setIsLoading(false);
@@ -100,7 +100,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await authRegisterFromService(payload);
 
-      // Simpan user sementara (email_verified: false) agar OtpVerifyPage bisa akses
       setCurrentUser(response.user);
       return payload.email;
     } finally {
@@ -109,7 +108,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const markEmailVerified = useCallback(() => {
-    setCurrentUser(prev => (prev ? { ...prev, email_verified: true } : prev));
+    const saved = getStoredUser();
+    setCurrentUser(saved);
   }, []);
 
   const value = useMemo<AuthContextValue>(

@@ -29,35 +29,16 @@ import {
   mockDb,
   persistMockDb,
 } from './database';
+import {
+  clearStoredSession,
+  createMockTokens,
+  getStoredUser,
+  saveStoredSession,
+  updateStoredUser,
+} from '../session';
 
-const STORAGE_KEY_USER = 'twistgram_user';
-const STORAGE_KEY_TOKENS = 'twistgram_tokens';
-
-export const storageGetUser = (): User | null => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_USER);
-    return raw ? (JSON.parse(raw) as User) : null;
-  } catch {
-    return null;
-  }
-};
-
-const storageSaveSession = (user: User) => {
-  localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-  localStorage.setItem(
-    STORAGE_KEY_TOKENS,
-    JSON.stringify({
-      access_token: `mock_access_${user.id}_${Date.now()}`,
-      refresh_token: `mock_refresh_${user.id}`,
-      expires_in: 3600,
-    })
-  );
-};
-
-export const storageClearSession = () => {
-  localStorage.removeItem(STORAGE_KEY_USER);
-  localStorage.removeItem(STORAGE_KEY_TOKENS);
-};
+export const storageGetUser = getStoredUser;
+export const storageClearSession = clearStoredSession;
 
 interface OtpEntry {
   code: string;
@@ -160,7 +141,7 @@ export const authLogin = async (payload: LoginPayload): Promise<LoginResponse> =
   }
 
   resetFailedAttempts(identifier);
-  storageSaveSession(user);
+  saveStoredSession(user, createMockTokens(user.id));
 
   return {
     user,
@@ -208,6 +189,7 @@ export const authRegister = async (payload: RegisterPayload): Promise<RegisterRe
   mockDb.postCounts[newUser.id] = 0;
   mockDb.userInterests[newUser.id] = [];
   persistMockDb();
+  saveStoredSession(newUser, createMockTokens(newUser.id));
 
   saveOtp('register', payload.email);
 
@@ -230,6 +212,13 @@ export const authVerifyOtp = async (payload: VerifyOtpPayload): Promise<OtpVerif
       user.email_verified = true;
       user.updated_at = new Date().toISOString();
       persistMockDb();
+      saveStoredSession(user);
+    } else {
+      updateStoredUser((currentUser) => ({
+        ...currentUser,
+        email_verified: true,
+        updated_at: new Date().toISOString(),
+      }));
     }
   }
 
@@ -268,7 +257,7 @@ export const authResetPassword = async (payload: ResetPasswordPayload): Promise<
     throw new Error('Token reset tidak valid atau sudah kadaluarsa.');
   }
 
-  storageClearSession();
+  clearStoredSession();
 };
 
 export const authRecoverUsername = async (payload: RecoverUsernamePayload): Promise<void> => {

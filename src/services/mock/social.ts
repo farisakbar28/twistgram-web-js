@@ -16,6 +16,7 @@ import type {
   ReportPayload,
 } from '../../types/social';
 import { getMockUserById, mockDb, persistMockDb } from './database';
+import { updateStoredUser } from '../session';
 
 export type MockFollow = Follow;
 export type MockBlock = {
@@ -29,18 +30,12 @@ export const MOCK_USERS = mockDb.users as unknown as User[];
 export const mockFollows = mockDb.follows as MockFollow[];
 export const mockBlocks = mockDb.blocks as MockBlock[];
 
-const STORAGE_KEY_USER = 'twistgram_user';
-
 const storageUpdateUser = (updates: Partial<User>) => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_USER);
-    if (!raw) return;
-    const user = JSON.parse(raw) as User;
-    const updated = { ...user, ...updates, updated_at: new Date().toISOString() };
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
-  } catch {
-    // ignore
-  }
+  updateStoredUser((user) => ({
+    ...user,
+    ...updates,
+    updated_at: new Date().toISOString(),
+  }));
 };
 
 const normalizeUser = (user: typeof mockDb.users[number]): User => ({

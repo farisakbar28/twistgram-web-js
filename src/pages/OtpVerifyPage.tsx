@@ -50,7 +50,7 @@ const PURPOSE_DESC: Record<OtpPurpose, string> = {
 const OtpVerifyPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { markEmailVerified } = useAuth();
+  const { currentUser, markEmailVerified } = useAuth();
   const toast = useToast();
 
   // Ambil state dari navigation
@@ -60,8 +60,11 @@ const OtpVerifyPage: React.FC = () => {
     phone?: string;     // untuk recover_email
   } | null;
 
-  const purpose: OtpPurpose = state?.purpose ?? 'register';
-  const identifier = state?.identifier ?? '';
+  const purpose: OtpPurpose =
+    state?.purpose ?? (currentUser && !currentUser.email_verified ? 'register' : 'register');
+  const identifier =
+    state?.identifier ??
+    (purpose === 'register' && currentUser && !currentUser.email_verified ? currentUser.email : '');
 
   // OTP digits
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
@@ -78,10 +81,13 @@ const OtpVerifyPage: React.FC = () => {
 
   // Jika tidak ada state (akses langsung URL), redirect ke login
   useEffect(() => {
-    if (!state?.identifier) {
+    const canRecoverRegisterFlow =
+      purpose === 'register' && !!currentUser && !currentUser.email_verified && !!identifier;
+
+    if (!state?.identifier && !canRecoverRegisterFlow) {
       navigate('/login', { replace: true });
     }
-  }, [state, navigate]);
+  }, [state, navigate, currentUser, purpose, identifier]);
 
   // Countdown timer
   useEffect(() => {
